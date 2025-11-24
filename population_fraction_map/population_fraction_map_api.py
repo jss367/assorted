@@ -1,0 +1,527 @@
+import os
+import time
+from typing import Dict, List
+
+import pandas as pd
+import plotly.express as px
+import requests
+
+# API Configuration
+API_KEY = os.getenv("API_NINJAS_API_KEY")
+API_BASE_URL = "https://api.api-ninjas.com/v1/population"
+
+# List of countries to query (you can expand this list)
+# Using a mix of full names and ISO codes
+COUNTRIES = [
+    "United States",
+    "China",
+    "India",
+    "Indonesia",
+    "Pakistan",
+    "Brazil",
+    "Nigeria",
+    "Bangladesh",
+    "Russia",
+    "Mexico",
+    "Japan",
+    "Ethiopia",
+    "Philippines",
+    "Egypt",
+    "Vietnam",
+    "DR Congo",
+    "Turkey",
+    "Iran",
+    "Germany",
+    "Thailand",
+    "United Kingdom",
+    "France",
+    "Italy",
+    "Tanzania",
+    "South Africa",
+    "Myanmar",
+    "Kenya",
+    "South Korea",
+    "Colombia",
+    "Spain",
+    "Argentina",
+    "Algeria",
+    "Sudan",
+    "Uganda",
+    "Ukraine",
+    "Iraq",
+    "Afghanistan",
+    "Poland",
+    "Canada",
+    "Morocco",
+    "Saudi Arabia",
+    "Uzbekistan",
+    "Peru",
+    "Angola",
+    "Malaysia",
+    "Mozambique",
+    "Ghana",
+    "Yemen",
+    "Nepal",
+    "Venezuela",
+    "Madagascar",
+    "Australia",
+    "North Korea",
+    "Cameroon",
+    "Niger",
+    "Taiwan",
+    "Mali",
+    "Burkina Faso",
+    "Syria",
+    "Sri Lanka",
+    "Malawi",
+    "Zambia",
+    "Romania",
+    "Chile",
+    "Kazakhstan",
+    "Netherlands",
+    "Guatemala",
+    "Ecuador",
+    "Cambodia",
+    "Senegal",
+    "Chad",
+    "Somalia",
+    "Zimbabwe",
+    "Guinea",
+    "Rwanda",
+    "Benin",
+    "Tunisia",
+    "Bolivia",
+    "Belgium",
+    "Haiti",
+    "Cuba",
+    "South Sudan",
+    "Dominican Republic",
+    "Czech Republic",
+    "Greece",
+    "Jordan",
+    "Portugal",
+    "Azerbaijan",
+    "Sweden",
+    "Honduras",
+    "United Arab Emirates",
+    "Hungary",
+    "Tajikistan",
+    "Belarus",
+    "Austria",
+    "Papua New Guinea",
+    "Serbia",
+    "Israel",
+    "Switzerland",
+    "Togo",
+    "Sierra Leone",
+    "Hong Kong",
+    "Laos",
+    "Paraguay",
+    "Bulgaria",
+    "Libya",
+    "Lebanon",
+    "Nicaragua",
+    "Kyrgyzstan",
+    "El Salvador",
+    "Turkmenistan",
+    "Singapore",
+    "Denmark",
+    "Finland",
+    "Congo",
+    "Slovakia",
+    "Norway",
+    "Oman",
+    "Palestine",
+    "Costa Rica",
+    "Liberia",
+    "Ireland",
+    "Central African Republic",
+    "New Zealand",
+    "Mauritania",
+    "Panama",
+    "Kuwait",
+    "Croatia",
+    "Moldova",
+    "Georgia",
+    "Eritrea",
+    "Uruguay",
+    "Bosnia and Herzegovina",
+    "Mongolia",
+    "Armenia",
+    "Jamaica",
+    "Qatar",
+    "Albania",
+    "Puerto Rico",
+    "Lithuania",
+    "Namibia",
+    "Gambia",
+    "Botswana",
+    "Gabon",
+    "Lesotho",
+    "North Macedonia",
+    "Slovenia",
+    "Guinea-Bissau",
+    "Latvia",
+    "Bahrain",
+    "Equatorial Guinea",
+    "Trinidad and Tobago",
+    "Estonia",
+    "Timor-Leste",
+    "Mauritius",
+    "Cyprus",
+    "Eswatini",
+    "Djibouti",
+    "Fiji",
+    "Reunion",
+    "Comoros",
+    "Guyana",
+    "Bhutan",
+    "Solomon Islands",
+    "Macao",
+    "Montenegro",
+    "Luxembourg",
+    "Suriname",
+    "Cabo Verde",
+    "Maldives",
+    "Malta",
+    "Brunei",
+    "Belize",
+    "Bahamas",
+    "Iceland",
+    "Vanuatu",
+    "Barbados",
+    "Sao Tome & Principe",
+    "Samoa",
+    "Saint Lucia",
+    "Kiribati",
+    "Micronesia",
+    "Grenada",
+    "Saint Vincent & the Grenadines",
+    "Tonga",
+    "Seychelles",
+    "Antigua and Barbuda",
+    "Andorra",
+    "Dominica",
+    "Saint Kitts & Nevis",
+    "Liechtenstein",
+    "Monaco",
+    "San Marino",
+    "Palau",
+    "Nauru",
+    "Tuvalu",
+    "Vatican City",
+]
+
+
+def get_population_data_for_country(country_name: str, api_key: str) -> Dict:
+    """
+    Fetch historical population data for a single country from API Ninjas.
+
+    Args:
+        country_name: Name of the country
+        api_key: API key for API Ninjas
+
+    Returns:
+        Dictionary with country data or None if request fails
+    """
+    headers = {'X-Api-Key': api_key}
+    params = {'country': country_name}
+
+    try:
+        response = requests.get(API_BASE_URL, headers=headers, params=params)
+
+        if response.status_code == 200:
+            data = response.json()
+            if data and 'country_name' in data:
+                return data
+            else:
+                print(f"  ⚠️  No data returned for {country_name}")
+                return None
+        else:
+            print(f"  ❌ Error {response.status_code} for {country_name}")
+            return None
+
+    except Exception as e:
+        print(f"  ❌ Exception for {country_name}: {str(e)}")
+        return None
+
+
+def get_country_iso3_mapping() -> Dict[str, str]:
+    """
+    Create a mapping of country names to ISO3 codes.
+    This is a simplified version - you may need to expand this.
+    """
+    mapping = {
+        "United States": "USA",
+        "China": "CHN",
+        "India": "IND",
+        "Indonesia": "IDN",
+        "Pakistan": "PAK",
+        "Brazil": "BRA",
+        "Nigeria": "NGA",
+        "Bangladesh": "BGD",
+        "Russia": "RUS",
+        "Mexico": "MEX",
+        "Japan": "JPN",
+        "Ethiopia": "ETH",
+        "Philippines": "PHL",
+        "Egypt": "EGY",
+        "Vietnam": "VNM",
+        "DR Congo": "COD",
+        "Turkey": "TUR",
+        "Iran": "IRN",
+        "Germany": "DEU",
+        "Thailand": "THA",
+        "United Kingdom": "GBR",
+        "France": "FRA",
+        "Italy": "ITA",
+        "South Africa": "ZAF",
+        "South Korea": "KOR",
+        "Spain": "ESP",
+        "Argentina": "ARG",
+        "Ukraine": "UKR",
+        "Poland": "POL",
+        "Canada": "CAN",
+        "Australia": "AUS",
+        "Romania": "ROU",
+        "Chile": "CHL",
+        "Netherlands": "NLD",
+        "Ecuador": "ECU",
+        "Guatemala": "GTM",
+        "Belgium": "BEL",
+        "Czech Republic": "CZE",
+        "Greece": "GRC",
+        "Portugal": "PRT",
+        "Sweden": "SWE",
+        "Hungary": "HUN",
+        "Belarus": "BLR",
+        "Austria": "AUT",
+        "Serbia": "SRB",
+        "Switzerland": "CHE",
+        "Bulgaria": "BGR",
+        "Denmark": "DNK",
+        "Finland": "FIN",
+        "Slovakia": "SVK",
+        "Norway": "NOR",
+        "Ireland": "IRL",
+        "Croatia": "HRV",
+        "Moldova": "MDA",
+        "Georgia": "GEO",
+        "Uruguay": "URY",
+        "Bosnia and Herzegovina": "BIH",
+        "Albania": "ALB",
+        "Lithuania": "LTU",
+        "Slovenia": "SVN",
+        "Latvia": "LVA",
+        "Estonia": "EST",
+        "North Macedonia": "MKD",
+        "Luxembourg": "LUX",
+        "Montenegro": "MNE",
+        "Malta": "MLT",
+        "Iceland": "ISL",
+        "Andorra": "AND",
+        "Liechtenstein": "LIE",
+        "Monaco": "MCO",
+        "San Marino": "SMR",
+        "Vatican City": "VAT",
+        "Puerto Rico": "PRI",
+        "Hong Kong": "HKG",
+        "Singapore": "SGP",
+    }
+    return mapping
+
+
+def fetch_all_country_data(countries: List[str], api_key: str) -> pd.DataFrame:
+    """
+    Fetch population data for all countries and compile into a dataframe.
+
+    Args:
+        countries: List of country names to query
+        api_key: API key for API Ninjas
+
+    Returns:
+        DataFrame with historical population data
+    """
+    all_data = []
+    iso3_mapping = get_country_iso3_mapping()
+
+    print(f"Fetching data for {len(countries)} countries...")
+    print("This may take a few minutes due to API rate limits.\n")
+
+    for i, country in enumerate(countries, 1):
+        print(f"[{i}/{len(countries)}] Fetching {country}...", end=" ")
+
+        data = get_population_data_for_country(country, api_key)
+
+        if data and 'historical_population' in data:
+            country_name = data['country_name']
+            iso3 = iso3_mapping.get(country_name, country_name[:3].upper())
+
+            # Extract historical population data
+            for year_data in data['historical_population']:
+                all_data.append(
+                    {
+                        'country': country_name,
+                        'country_code': iso3,
+                        'year': year_data['year'],
+                        'population': year_data['population'],
+                    }
+                )
+
+            print("✓")
+        else:
+            print("")
+
+        # Be nice to the API - add a small delay
+        time.sleep(0.1)
+
+    df = pd.DataFrame(all_data)
+    print(f"\n✅ Successfully fetched data for {df['country'].nunique()} countries")
+    return df
+
+
+def calculate_population_fractions(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate each country's current population as a fraction of its historical peak.
+
+    Args:
+        df: DataFrame with historical population data
+
+    Returns:
+        DataFrame with population fractions calculated
+    """
+    # Get the most recent year's data for current population
+    latest_year = df['year'].max()
+    current_pop = df[df['year'] == latest_year][['country', 'country_code', 'population']].copy()
+    current_pop.columns = ['country', 'country_code', 'current_population']
+
+    # Get historical peak for each country
+    peak_pop = df.groupby('country_code').agg({'population': 'max', 'country': 'first'}).reset_index()
+    peak_pop.columns = ['country_code', 'peak_population', 'country']
+
+    # Merge current and peak populations
+    result = current_pop.merge(peak_pop, on=['country', 'country_code'])
+
+    # Calculate fraction
+    result['population_fraction'] = result['current_population'] / result['peak_population']
+
+    # Round for display
+    result['fraction_display'] = result['population_fraction'].round(3)
+
+    return result
+
+
+def create_map(df_fractions: pd.DataFrame) -> object:
+    """
+    Create an interactive choropleth map using Plotly.
+
+    Args:
+        df_fractions: DataFrame with population fractions
+
+    Returns:
+        Plotly figure object
+    """
+    fig = px.choropleth(
+        df_fractions,
+        locations='country_code',
+        color='population_fraction',
+        hover_name='country',
+        hover_data={
+            'country_code': False,
+            'population_fraction': ':.3f',
+            'current_population': ':,.0f',
+            'peak_population': ':,.0f',
+        },
+        color_continuous_scale='RdYlGn',
+        range_color=[0.5, 1.0],
+        labels={
+            'population_fraction': 'Population Fraction',
+            'current_population': 'Current Population',
+            'peak_population': 'Peak Population',
+        },
+        title='Countries\' Current Population as Fraction of Historical Peak (API Ninjas Data)',
+    )
+
+    fig.update_layout(
+        geo=dict(showframe=False, showcoastlines=True, projection_type='natural earth'), height=600, width=1200
+    )
+
+    return fig
+
+
+def main():
+    """Main execution function."""
+
+    # Check if API key is set
+    if API_KEY == "YOUR_API_KEY_HERE":
+        print("=" * 70)
+        print("⚠️  ERROR: API Key Not Set")
+        print("=" * 70)
+        print("\nPlease follow these steps:")
+        print("1. Go to https://api-ninjas.com/")
+        print("2. Sign up for a free account")
+        print("3. Get your API key from your account dashboard")
+        print("4. Replace 'YOUR_API_KEY_HERE' in this script with your actual API key")
+        print("\nThe free tier includes 50,000 API calls per month, which is plenty")
+        print("for this application.")
+        print("=" * 70)
+        return
+
+    # Fetch data from API
+    print("=" * 70)
+    print("FETCHING POPULATION DATA FROM API")
+    print("=" * 70)
+    df = fetch_all_country_data(COUNTRIES, API_KEY)
+
+    if df.empty:
+        print("\n❌ No data was fetched. Please check your API key and internet connection.")
+        return
+
+    # Calculate fractions
+    print("\n" + "=" * 70)
+    print("CALCULATING POPULATION FRACTIONS")
+    print("=" * 70)
+    df_fractions = calculate_population_fractions(df)
+
+    # Display interesting results
+    print("\n=== COUNTRIES AT PEAK POPULATION (fraction ≥ 0.99) ===")
+    at_peak = df_fractions[df_fractions['population_fraction'] >= 0.99].sort_values(
+        'current_population', ascending=False
+    )
+    if not at_peak.empty:
+        print(at_peak[['country', 'fraction_display', 'current_population']].head(15).to_string(index=False))
+
+    print("\n=== COUNTRIES BELOW PEAK POPULATION (fraction < 0.90) ===")
+    below_peak = df_fractions[df_fractions['population_fraction'] < 0.90].sort_values('population_fraction')
+    if not below_peak.empty:
+        print(
+            below_peak[['country', 'fraction_display', 'current_population', 'peak_population']]
+            .head(15)
+            .to_string(index=False)
+        )
+
+    # Create and save the map
+    print("\n" + "=" * 70)
+    print("CREATING MAP VISUALIZATION")
+    print("=" * 70)
+    fig = create_map(df_fractions)
+
+    # Save outputs
+    output_html = 'population_fraction_map.html'
+    output_csv = 'population_fractions.csv'
+
+    fig.write_html(output_html)
+    print(f"✅ Map saved to: {output_html}")
+
+    df_fractions.sort_values('population_fraction').to_csv(output_csv, index=False)
+    print(f"✅ Data saved to: {output_csv}")
+
+    print("\n" + "=" * 70)
+    print("✨ COMPLETE! Open the HTML file in your browser to view the map.")
+    print("=" * 70)
+
+    return fig
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,60 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Population Fraction Map API",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/population_fraction_map/population_fraction_map_api.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/population_fraction_map",
+            "justMyCode": true
+        },
+        {
+            "name": "Python: Population Fraction Map (Local Data)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/population_fraction_map/population_fraction_map.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/population_fraction_map",
+            "justMyCode": true
+        },
+        {
+            "name": "Python: Test API Key",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/population_fraction_map/test_api_key.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/population_fraction_map",
+            "env": {
+                "API_NINJAS_API_KEY": "${env:API_NINJAS_API_KEY}"
+            },
+            "justMyCode": true
+        },
+        {
+            "name": "Python: Check Google Credentials",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/google_credentials/check_google_credentials.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/google_credentials",
+            "env": {
+                "GOOGLE_GENAI_USE_VERTEXAI": "${env:GOOGLE_GENAI_USE_VERTEXAI}",
+                "GOOGLE_CLOUD_PROJECT": "${env:GOOGLE_CLOUD_PROJECT}",
+                "GOOGLE_CLOUD_LOCATION": "${env:GOOGLE_CLOUD_LOCATION}",
+                "GOOGLE_APPLICATION_CREDENTIALS": "${env:GOOGLE_APPLICATION_CREDENTIALS}",
+                "GOOGLE_API_KEY": "${env:GOOGLE_API_KEY}"
+            },
+            "justMyCode": true
+        },
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${fileDirname}",
+            "justMyCode": true
+        }
+    ]
+}
