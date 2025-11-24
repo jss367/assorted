@@ -1,6 +1,7 @@
 import os
 import time
-from typing import Dict, List
+from pathlib import Path
+from typing import Dict
 
 import pandas as pd
 import plotly.express as px
@@ -331,12 +332,12 @@ def get_country_iso3_mapping() -> Dict[str, str]:
     return mapping
 
 
-def fetch_all_country_data(countries: List[str], api_key: str) -> pd.DataFrame:
+def fetch_all_country_data(countries: list[str], api_key: str) -> pd.DataFrame:
     """
     Fetch population data for all countries and compile into a dataframe.
 
     Args:
-        countries: List of country names to query
+
         api_key: API key for API Ninjas
 
     Returns:
@@ -452,21 +453,6 @@ def create_map(df_fractions: pd.DataFrame) -> object:
 def main():
     """Main execution function."""
 
-    # Check if API key is set
-    if API_KEY == "YOUR_API_KEY_HERE":
-        print("=" * 70)
-        print("⚠️  ERROR: API Key Not Set")
-        print("=" * 70)
-        print("\nPlease follow these steps:")
-        print("1. Go to https://api-ninjas.com/")
-        print("2. Sign up for a free account")
-        print("3. Get your API key from your account dashboard")
-        print("4. Replace 'YOUR_API_KEY_HERE' in this script with your actual API key")
-        print("\nThe free tier includes 50,000 API calls per month, which is plenty")
-        print("for this application.")
-        print("=" * 70)
-        return
-
     # Fetch data from API
     print("=" * 70)
     print("FETCHING POPULATION DATA FROM API")
@@ -506,9 +492,10 @@ def main():
     print("=" * 70)
     fig = create_map(df_fractions)
 
-    # Save outputs
-    output_html = 'population_fraction_map.html'
-    output_csv = 'population_fractions.csv'
+    # Save outputs to the script's directory
+    script_dir = Path(__file__).parent
+    output_html = script_dir / 'population_fraction_map.html'
+    output_csv = script_dir / 'population_fractions.csv'
 
     fig.write_html(output_html)
     print(f"✅ Map saved to: {output_html}")
