@@ -64,7 +64,26 @@ def create_visualizations(responses, true_value, output_dir='.'):
     # 1. Distribution histogram
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.hist(responses, bins=30, alpha=0.7, edgecolor='black')
-    ax.axvline(true_value, color='green', linestyle='--', linewidth=2, label=f'True Value ({true_value}%)')
+    # ax.axvline(true_value, color='green', linestyle='--', linewidth=2, label=f'True Value ({true_value}%)')
+    ax.axvline(
+        arithmetic_mean, color='red', linestyle='--', linewidth=2, label=f'Arithmetic Mean ({arithmetic_mean:.2f}%)'
+    )
+    # ax.axvline(
+    #     geometric_mean, color='blue', linestyle='--', linewidth=2, label=f'Geometric Mean ({geometric_mean:.2f}%)'
+    # )
+    ax.set_xlabel('Poll Response (% of budget)', fontsize=12)
+    ax.set_ylabel('Frequency', fontsize=12)
+    ax.set_title('Distribution of Poll Responses: Foreign Aid % of US Budget', fontsize=14, fontweight='bold')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(output_path / 'distribution_histogram.png', dpi=150)
+    plt.close()
+
+    # 2. Histogram with geometric mean
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.hist(responses, bins=30, alpha=0.7, edgecolor='black')
+    # ax.axvline(true_value, color='green', linestyle='--', linewidth=2, label=f'True Value ({true_value}%)')
     ax.axvline(
         arithmetic_mean, color='red', linestyle='--', linewidth=2, label=f'Arithmetic Mean ({arithmetic_mean:.2f}%)'
     )
@@ -77,25 +96,7 @@ def create_visualizations(responses, true_value, output_dir='.'):
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(output_path / 'distribution_histogram.png', dpi=150)
-    plt.close()
-
-    # 2. Linear scale comparison
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.hist(responses, bins=30, alpha=0.7, edgecolor='black', color='skyblue')
-    ax.axvline(
-        arithmetic_mean, color='red', linestyle='--', linewidth=2, label=f'Arithmetic Mean ({arithmetic_mean:.2f}%)'
-    )
-    ax.axvline(
-        geometric_mean, color='blue', linestyle='--', linewidth=2, label=f'Geometric Mean ({geometric_mean:.2f}%)'
-    )
-    ax.set_xlabel('Response Value (%)', fontsize=12)
-    ax.set_ylabel('Frequency', fontsize=12)
-    ax.set_title('Linear Scale: Arithmetic vs Geometric Mean', fontsize=14, fontweight='bold')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(output_path / 'linear_scale_comparison.png', dpi=150)
+    plt.savefig(output_path / 'distribution_histogram_geometric_mean.png', dpi=150)
     plt.close()
 
     # 3. Log-scale transformation
