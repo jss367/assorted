@@ -19,13 +19,13 @@ def generate_poll_responses(n_responses, true_value):
     np.random.seed(42)  # For reproducibility
 
     # Add some clear outliers (15-50%)
-    n_outliers = int(n_responses * 0.15)
+    n_outliers = int(n_responses * 0.25)
 
     # Most responses centered around 2-3% with log-normal distribution
     n_main = n_responses - n_outliers
     main_responses = np.random.lognormal(mean=0.8, sigma=0.6, size=n_main)
 
-    outliers = np.random.uniform(15, 50, size=n_outliers)
+    outliers = np.random.uniform(15, 99, size=n_outliers)
 
     # Combine and shuffle
     all_responses = np.concatenate([main_responses, outliers])
@@ -64,7 +64,7 @@ def create_visualizations(responses, true_value, output_dir='.'):
     # 1. Distribution histogram
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.hist(responses, bins=30, alpha=0.7, edgecolor='black')
-    # ax.axvline(true_value, color='green', linestyle='--', linewidth=2, label=f'True Value ({true_value}%)')
+    ax.axvline(true_value, color='green', linestyle='--', linewidth=2, label=f'True Value ({true_value}%)')
     ax.axvline(
         arithmetic_mean, color='red', linestyle='--', linewidth=2, label=f'Arithmetic Mean ({arithmetic_mean:.2f}%)'
     )
@@ -73,7 +73,7 @@ def create_visualizations(responses, true_value, output_dir='.'):
     # )
     ax.set_xlabel('Poll Response (% of budget)', fontsize=12)
     ax.set_ylabel('Frequency', fontsize=12)
-    ax.set_title('Distribution of Poll Responses: Foreign Aid % of US Budget', fontsize=14, fontweight='bold')
+    ax.set_title('Simulated Distribution of Poll Responses: Foreign Aid % of US Budget', fontsize=14, fontweight='bold')
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -83,7 +83,7 @@ def create_visualizations(responses, true_value, output_dir='.'):
     # 2. Histogram with geometric mean
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.hist(responses, bins=30, alpha=0.7, edgecolor='black')
-    # ax.axvline(true_value, color='green', linestyle='--', linewidth=2, label=f'True Value ({true_value}%)')
+    ax.axvline(true_value, color='green', linestyle='--', linewidth=2, label=f'True Value ({true_value}%)')
     ax.axvline(
         arithmetic_mean, color='red', linestyle='--', linewidth=2, label=f'Arithmetic Mean ({arithmetic_mean:.2f}%)'
     )
@@ -92,7 +92,7 @@ def create_visualizations(responses, true_value, output_dir='.'):
     )
     ax.set_xlabel('Poll Response (% of budget)', fontsize=12)
     ax.set_ylabel('Frequency', fontsize=12)
-    ax.set_title('Distribution of Poll Responses: Foreign Aid % of US Budget', fontsize=14, fontweight='bold')
+    ax.set_title('Simulated Distribution of Poll Responses: Foreign Aid % of US Budget', fontsize=14, fontweight='bold')
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()

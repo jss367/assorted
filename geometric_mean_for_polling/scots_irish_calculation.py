@@ -114,19 +114,19 @@ if __name__ == "__main__":
     print("\n" + "=" * 50)
     print("Example: Calculating means from dictionary")
     print("=" * 50)
-    guesses = {5.0: 1, 0.1: 50}  # 1 person guessed 5%,
+    guesses = {5.0: 1, 0.1: 49}  # 1 person guessed 5%,
     arith_mean, geo_mean = calculate_means(guesses)
     print(f"Guesses: {guesses}")
     print(f"Arithmetic mean: {arith_mean:.4f}%")
     print(f"Geometric mean: {geo_mean:.4f}%")
 
     # Print log transformation table
-    print_log_transformation()
+    # print_log_transformation()
 
-    # Another example with non-zero guesses
-    print("\n" + "-" * 50)
-    guesses2 = {1.0: 10, 2.0: 5, 3.0: 2}  # Various guesses
-    arith_mean2, geo_mean2 = calculate_means(guesses2)
-    print(f"Guesses: {guesses2}")
-    print(f"Arithmetic mean: {arith_mean2:.4f}%")
-    print(f"Geometric mean: {geo_mean2:.4f}%")
+    # # Another example with non-zero guesses
+    # print("\n" + "-" * 50)
+    # guesses2 = {1.0: 10, 2.0: 5, 3.0: 2}  # Various guesses
+    # arith_mean2, geo_mean2 = calculate_means(guesses2)
+    # print(f"Guesses: {guesses2}")
+    # print(f"Arithmetic mean: {arith_mean2:.4f}%")
+    # print(f"Geometric mean: {geo_mean2:.4f}%")

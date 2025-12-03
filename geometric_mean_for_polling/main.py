@@ -12,7 +12,7 @@ from geometric_mean_polling import calculate_geometric_mean, create_visualizatio
 def main():
     """Generate synthetic poll data and create visualizations"""
     # Configuration
-    n_responses = 150  # Number of poll responses
+    n_responses = 200  # Number of poll responses
     true_value = 1.0  # Actual percentage (~1% of US budget is foreign aid)
     output_dir = './output'
 
