@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Largest Votes in History</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #00dbde, #fc00ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .subtitle {
+            text-align: center;
+            color: #b8b8b8;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .chart-container {
+            position: relative;
+            height: 600px;
+            margin-bottom: 40px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 15px;
+            padding: 20px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .info-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .info-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+        .info-card h3 {
+            color: #00dbde;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        .info-card p {
+            color: #d0d0d0;
+            line-height: 1.6;
+            margin: 5px 0;
+        }
+        .highlight {
+            color: #fc00ff;
+            font-weight: bold;
+        }
+        .legend {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .legend span {
+            margin: 0 15px;
+            font-size: 0.9em;
+        }
+        .democratic {
+            color: #4CAF50;
+        }
+        .controlled {
+            color: #ff6b6b;
+        }
+        .mixed {
+            color: #ffd93d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>The Evolution of Mass Voting Through History</h1>
+        <p class="subtitle">From Ancient Athens to Modern Democracies: The Largest Votes Ever Recorded</p>
+        
+        <div class="legend">
+            <span class="democratic">● Democratic Elections</span>
+            <span class="controlled">● Controlled/One-Party Elections</span>
+            <span class="mixed">● Mixed/Restricted Franchise</span>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="votesChart"></canvas>
+        </div>
+        
+        <div class="info-grid">
+            <div class="info-card">
+                <h3>📈 The Record Holder</h3>
+                <p>India's 2019 General Election holds the all-time record with <span class="highlight">603.7 million</span> voters - more than the entire population of most continents!</p>
+            </div>
+            <div class="info-card">
+                <h3>🏛️ Ancient Democracy</h3>
+                <p>Athens (471 BCE) pioneered mass voting with ~8,500 citizens voting on ostracism - revolutionary for its time when most were ruled by kings.</p>
+            </div>
+            <div class="info-card">
+                <h3>🌍 Geographic Giants</h3>
+                <p>The top 5 largest votes all come from just 4 countries: India (3), Indonesia (1), and historically the USSR (1).</p>
+            </div>
+            <div class="info-card">
+                <h3>📊 Democratic Progress</h3>
+                <p>From 1848's 7.5 million French voters to 2019's 603.7 million Indian voters - an <span class="highlight">80-fold increase</span> in democratic participation!</p>
+            </div>
+            <div class="info-card">
+                <h3>🗳️ Single-Day Record</h3>
+                <p>Indonesia's 2019 election saw 154 million people vote in just <span class="highlight">10 hours</span> - the largest single-day democratic exercise ever.</p>
+            </div>
+            <div class="info-card">
+                <h3>🚀 Exponential Growth</h3>
+                <p>The 20th century saw voter numbers explode from millions to hundreds of millions as universal suffrage spread globally.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data for the chart
+        const votingData = [
+            { year: -471, voters: 0.0085, label: "Athens Ostracism", location: "Athens", type: "democratic" },
+            { year: -70, voters: 0.05, label: "Roman Republic", location: "Rome", type: "mixed" },
+            { year: 1573, voters: 0.04, label: "Polish Royal Election", location: "Poland", type: "mixed" },
+            { year: 1804, voters: 3.5, label: "French Empire Plebiscite", location: "France", type: "controlled" },
+            { year: 1848, voters: 7.5, label: "French Presidential", location: "France", type: "democratic" },
+            { year: 1870, voters: 8.9, label: "French Constitutional", location: "France", type: "democratic" },
+            { year: 1917, voters: 45.9, label: "Russian Constituent Assembly", location: "Russia", type: "democratic" },
+            { year: 1937, voters: 91, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1984, voters: 184, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1984.5, voters: 256.3, label: "Indian General Election", location: "India", type: "democratic" },
+            { year: 2014, voters: 554, label: "Indian General Election", location: "India", type: "democratic" },
+            { year: 2019, voters: 603.7, label: "Indian General Election", location: "India", type: "democratic" },
+            { year: 2019.3, voters: 154, label: "Indonesian Election", location: "Indonesia", type: "democratic" },
+            { year: 2020, voters: 158.4, label: "US Presidential", location: "USA", type: "democratic" }
+        ];
+
+        // Color mapping for vote types
+        const colorMap = {
+            democratic: 'rgba(76, 175, 80, 0.8)',
+            controlled: 'rgba(255, 107, 107, 0.8)',
+            mixed: 'rgba(255, 217, 61, 0.8)'
+        };
+
+        // Create the chart
+        const ctx = document.getElementById('votesChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Number of Voters',
+                    data: votingData.map(d => ({
+                        x: d.year,
+                        y: d.voters,
+                        label: d.label,
+                        location: d.location
+                    })),
+                    backgroundColor: votingData.map(d => colorMap[d.type]),
+                    borderColor: votingData.map(d => colorMap[d.type]),
+                    borderWidth: 2,
+                    pointRadius: votingData.map(d => Math.max(6, Math.min(20, Math.sqrt(d.voters)))),
+                    pointHoverRadius: votingData.map(d => Math.max(8, Math.min(25, Math.sqrt(d.voters) + 2)))
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const point = votingData[context.dataIndex];
+                                return [
+                                    `${point.label}`,
+                                    `Location: ${point.location}`,
+                                    `Voters: ${point.voters >= 1 ? point.voters.toFixed(1) + ' million' : (point.voters * 1000000).toLocaleString()}`
+                                ];
+                            }
+                        },
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#fff',
+                        borderWidth: 1,
+                        padding: 12,
+                        displayColors: false
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        position: 'bottom',
+                        title: {
+                            display: true,
+                            text: 'Year',
+                            color: '#fff',
+                            font: {
+                                size: 14
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#fff',
+                            callback: function(value) {
+                                if (value < 0) {
+                                    return Math.abs(value) + ' BCE';
+                                }
+                                return value + ' CE';
+                            }
+                        }
+                    },
+                    y: {
+                        type: 'logarithmic',
+                        title: {
+                            display: true,
+                            text: 'Number of Voters (millions, log scale)',
+                            color: '#fff',
+                            font: {
+                                size: 14
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#fff',
+                            callback: function(value) {
+                                if (value >= 1) {
+                                    return value + 'M';
+                                } else if (value >= 0.001) {
+                                    return (value * 1000) + 'K';
+                                }
+                                return value;
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 2000,
+                    easing: 'easeInOutQuart'
+                }
+            }
+        });
+
+        // Add connecting line animation
+        setTimeout(() => {
+            chart.options.plugins.annotation = {
+                annotations: {
+                    line1: {
+                        type: 'line',
+                        scaleID: 'x',
+                        value: 2019,
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        label: {
+                            content: 'Modern Era',
+                            enabled: true,
+                            position: 'start'
+                        }
+                    }
+                }
+            };
+            chart.update();
+        }, 2500);
+    </script>
+</body>
+</html>

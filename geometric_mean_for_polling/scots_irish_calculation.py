@@ -120,6 +120,16 @@ if __name__ == "__main__":
     print(f"Arithmetic mean: {arith_mean:.4f}%")
     print(f"Geometric mean: {geo_mean:.4f}%")
 
+    # Example: Calculate means from dictionary
+    print("\n" + "=" * 50)
+    print("Example: Calculating means from dictionary")
+    print("=" * 50)
+    guesses = {2.0: 49, 40: 4}
+    arith_mean, geo_mean = calculate_means(guesses)
+    print(f"Guesses: {guesses}")
+    print(f"Arithmetic mean: {arith_mean:.4f}%")
+    print(f"Geometric mean: {geo_mean:.4f}%")
+
     # Print log transformation table
     # print_log_transformation()
 

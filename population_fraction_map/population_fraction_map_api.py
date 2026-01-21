@@ -213,6 +213,13 @@ COUNTRIES = [
     "Vatican City",
 ]
 
+COUNTRIES = [
+    "United States",
+    "China",
+    "India",
+    "Ireland",
+]
+
 
 def get_population_data_for_country(country_name: str, api_key: str) -> Dict:
     """
