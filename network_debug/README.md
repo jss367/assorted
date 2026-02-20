@@ -1,4 +1,17 @@
+# Network & Certificate Diagnostic Script
 
+Diagnoses certificate errors, router issues, proxy interception, and clock drift.
+
+## Usage
+
+```bash
+chmod +x ~/network-cert-debug.sh
+~/network-cert-debug.sh
+```
+
+Results are printed to the terminal and saved to `~/cert-debug-results.txt`.
+
+## Safety
 
 This script is completely safe on a public network:
   - All read-only — it only looks at things, never changes anything
