@@ -28,7 +28,8 @@ ssl_check() {
     wait "$watchdog" 2>/dev/null
 }
 
-OUTPUT_FILE="$HOME/cert-debug-results.txt"
+TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+OUTPUT_FILE="$HOME/cert-debug-results_${TIMESTAMP}.txt"
 exec > >(tee "$OUTPUT_FILE") 2>&1
 
 echo -e "${BOLD}========================================${NC}"
