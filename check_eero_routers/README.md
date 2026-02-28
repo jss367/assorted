@@ -18,7 +18,7 @@ python check_eero.py
 
 On the first run you'll be asked for the email or phone number on your eero
 account, then a verification code sent via SMS/email. Credentials are cached
-in `~/.eero_session` so subsequent runs are automatic.
+in your system keyring so subsequent runs are automatic.
 
 **Note:** Amazon-linked eero accounts are not supported by the API. If your
 account uses Amazon login, have someone in your household create a standard
