@@ -162,7 +162,7 @@
             </div>
             <div class="info-card">
                 <h3>🌍 Geographic Giants</h3>
-                <p>The top 5 largest votes all come from just 4 countries: India (3), the USA (1), and historically the USSR (1).</p>
+                <p>The top 5 largest votes all come from just 3 countries: India (3), France (1), and historically the USSR (1).</p>
             </div>
             <div class="info-card">
                 <h3>📊 Democratic Progress</h3>
@@ -189,6 +189,7 @@
             { year: -471, voters: 0.0085, low: 0.006, high: 0.01, label: "Athens Ostracism", location: "Athens", type: "democratic" },
             { year: -70, voters: 0.05, low: 0.02, high: 0.07, label: "Roman Republic", location: "Rome", type: "mixed" },
             { year: 1573, voters: 0.04, low: 0.04, high: 0.05, label: "Polish Royal Election", location: "Poland", type: "mixed" },
+            { year: 1715, voters: 0.25, low: 0.2, high: 0.3, label: "British General Election", location: "Britain", type: "mixed" },
             { year: 1804, voters: 3.5, low: 3.0, high: 3.52, label: "French Empire Plebiscite", location: "France", type: "controlled" },
             { year: 1848, voters: 7.5, low: 7.3, high: 7.8, label: "French Presidential", location: "France", type: "democratic" },
             { year: 1870, voters: 9.0, low: 8.85, high: 9.0, label: "French Constitutional", location: "France", type: "democratic" },
@@ -198,8 +199,6 @@
             { year: 1984.5, voters: 256.3, low: 256, high: 256.5, label: "Indian General Election", location: "India", type: "democratic" },
             { year: 2014, voters: 554, low: 553.5, high: 554.5, label: "Indian General Election", location: "India", type: "democratic" },
             { year: 2019, voters: 603.7, low: 603, high: 604.5, label: "Indian General Election", location: "India", type: "democratic" },
-            { year: 2019.3, voters: 154, low: 152, high: 155, label: "Indonesian Election", location: "Indonesia", type: "democratic" },
-            { year: 2020, voters: 158.4, low: 158.4, high: 159.6, label: "US Presidential", location: "USA", type: "democratic" }
         ];
 
         // World population data (in millions)
@@ -234,15 +233,9 @@
             { year: 2300, pop: 9000 },
         ];
 
-        // Log-linear regression on largest democratic votes
+        // Log-linear regression on all elections after 1500
         function fitVoteTrend() {
-            const keyPoints = [
-                { year: 1848, voters: 7.5 },
-                { year: 1917, voters: 44.4 },
-                { year: 1984.5, voters: 256.3 },
-                { year: 2014, voters: 554 },
-                { year: 2019, voters: 603.7 },
-            ];
+            const keyPoints = votingData.filter(d => d.year >= 1500);
             const n = keyPoints.length;
             const sumX = keyPoints.reduce((s, p) => s + p.year, 0);
             const sumLnY = keyPoints.reduce((s, p) => s + Math.log(p.voters), 0);
@@ -291,7 +284,7 @@
 
         // Build trend line through historical data AND projected forward
         const projectionEnd = intersection ? intersection.year : 2100;
-        const trendLineStart = 1800; // start where the fit becomes meaningful
+        const trendLineStart = 1500; // start where the fit becomes meaningful
         const projectedVotes = [];
         // Historical portion of the trend line (solid will be styled differently)
         for (let y = trendLineStart; y <= projectionEnd; y += 5) {
