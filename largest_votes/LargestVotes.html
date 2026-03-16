@@ -140,47 +140,15 @@
         </div>
         
         <div class="view-controls">
-            <button class="view-btn active" data-view="shared">Shared Scale (Log)</button>
-            <button class="view-btn" data-view="dual">Dual Axes</button>
+            <button class="view-btn active" data-view="shared">All Time</button>
             <button class="view-btn" data-view="early-modern">Early Modern (1500+)</button>
             <button class="view-btn" data-view="modern">Modern Era (1800+)</button>
-            <button class="view-btn" data-view="linear">Shared Scale (Linear)</button>
         </div>
 
         <div class="chart-container">
             <canvas id="votesChart"></canvas>
         </div>
         
-        <div class="info-grid">
-            <div class="info-card">
-                <h3>📈 The Record Holder</h3>
-                <p>India's 2019 General Election holds the all-time record with <span class="highlight">603.7 million</span> voters - more than the entire population of most continents!</p>
-            </div>
-            <div class="info-card">
-                <h3>🏛️ Ancient Democracy</h3>
-                <p>Athens (471 BCE) pioneered mass voting with ~8,500 citizens voting on ostracism - revolutionary for its time when most were ruled by kings.</p>
-            </div>
-            <div class="info-card">
-                <h3>🌍 Geographic Giants</h3>
-                <p>The top 5 largest votes all come from just 3 countries: India (3), France (1), and historically the USSR (1).</p>
-            </div>
-            <div class="info-card">
-                <h3>📊 Democratic Progress</h3>
-                <p>From 1848's 7.5 million French voters to 2019's 603.7 million Indian voters - an <span class="highlight">80-fold increase</span> in democratic participation!</p>
-            </div>
-            <div class="info-card">
-                <h3>🗳️ Single-Day Record</h3>
-                <p>Indonesia's 2019 election saw 154 million people vote in just <span class="highlight">6 hours</span> (7am–1pm) - the largest single-day democratic exercise ever.</p>
-            </div>
-            <div class="info-card">
-                <h3>🚀 Exponential Growth</h3>
-                <p>The 20th century saw voter numbers explode from millions to hundreds of millions as universal suffrage spread globally.</p>
-            </div>
-            <div class="info-card" id="intersection-card">
-                <h3>🔮 When Will They Meet?</h3>
-                <p>If the largest-vote trend continues, it would intersect world population around <span class="highlight" id="intersection-year"></span> — meaning a single election could theoretically involve every person on Earth.</p>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -625,7 +593,7 @@
                 scales: {
                     x: {
                         type: 'linear', position: 'bottom',
-                        max: intersection ? intersection.year + 20 : 2110,
+                        max: 2200,
                         title: { display: true, text: 'Year', color: '#fff', font: { size: 14 } },
                         grid: { color: 'rgba(255, 255, 255, 0.1)' },
                         ticks: { color: '#fff', callback: xTickCallback }
@@ -638,37 +606,13 @@
                     }
                 }
             },
-            dual: {
-                datasets: [makeVotersDataset('y'), makePopDataset('y2'), makeTrendHistoricalDataset('y'), makeProjectionDataset('y'), makeIntersectionDataset('y2')].filter(Boolean),
-                scales: {
-                    x: {
-                        type: 'linear', position: 'bottom',
-                        max: intersection ? intersection.year + 20 : 2110,
-                        title: { display: true, text: 'Year', color: '#fff', font: { size: 14 } },
-                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                        ticks: { color: '#fff', callback: xTickCallback }
-                    },
-                    y: {
-                        type: 'logarithmic', position: 'left',
-                        title: { display: true, text: 'Voters (millions)', color: 'rgba(76, 175, 80, 0.9)', font: { size: 14 } },
-                        grid: { color: 'rgba(76, 175, 80, 0.1)' },
-                        ticks: { color: 'rgba(76, 175, 80, 0.9)', callback: yTickCallback }
-                    },
-                    y2: {
-                        type: 'linear', position: 'right',
-                        title: { display: true, text: 'World Population (millions)', color: 'rgba(0, 191, 255, 0.9)', font: { size: 14 } },
-                        grid: { drawOnChartArea: false },
-                        ticks: { color: 'rgba(0, 191, 255, 0.9)', callback: yTickCallback }
-                    }
-                }
-            },
             'early-modern': {
                 datasets: [makeVotersDataset(), makePopDataset(), makeTrendHistoricalDataset(), makeProjectionDataset(), makeIntersectionDataset()].filter(Boolean),
                 scales: {
                     x: {
                         type: 'linear', position: 'bottom',
                         min: 1500,
-                        max: intersection ? intersection.year + 20 : 2110,
+                        max: 2200,
                         title: { display: true, text: 'Year', color: '#fff', font: { size: 14 } },
                         grid: { color: 'rgba(255, 255, 255, 0.1)' },
                         ticks: { color: '#fff', callback: xTickCallback }
@@ -687,7 +631,7 @@
                     x: {
                         type: 'linear', position: 'bottom',
                         min: 1800,
-                        max: intersection ? intersection.year + 20 : 2110,
+                        max: 2200,
                         title: { display: true, text: 'Year', color: '#fff', font: { size: 14 } },
                         grid: { color: 'rgba(255, 255, 255, 0.1)' },
                         ticks: { color: '#fff', callback: xTickCallback }
@@ -700,24 +644,6 @@
                     }
                 }
             },
-            linear: {
-                datasets: [makeVotersDataset(), makePopDataset(), makeTrendHistoricalDataset(), makeProjectionDataset(), makeIntersectionDataset()].filter(Boolean),
-                scales: {
-                    x: {
-                        type: 'linear', position: 'bottom',
-                        max: intersection ? intersection.year + 20 : 2110,
-                        title: { display: true, text: 'Year', color: '#fff', font: { size: 14 } },
-                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                        ticks: { color: '#fff', callback: xTickCallback }
-                    },
-                    y: {
-                        type: 'linear', position: 'left',
-                        title: { display: true, text: 'People (millions)', color: '#fff', font: { size: 14 } },
-                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                        ticks: { color: '#fff', callback: yTickCallback }
-                    }
-                }
-            }
         };
 
         // --- Create chart ---
@@ -732,7 +658,7 @@
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        display: true,
+                        display: false,
                         labels: {
                             color: '#fff',
                             filter: function(item) {
@@ -774,13 +700,6 @@
         });
 
         // Display intersection info
-        const yearEl = document.getElementById('intersection-year');
-        if (intersection) {
-            const popB = (intersection.pop / 1000).toFixed(1);
-            yearEl.textContent = '~' + intersection.year + ' CE (~' + popB + ' billion people)';
-        } else {
-            yearEl.textContent = 'beyond 2300';
-        }
     </script>
 </body>
 </html>
