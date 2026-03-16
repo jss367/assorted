@@ -338,6 +338,85 @@
             }
         };
 
+        // Plugin to draw point labels with arrows
+        const pointLabelsPlugin = {
+            id: 'pointLabels',
+            afterDatasetsDraw(chart) {
+                const { ctx: c, scales: { x: xScale }, chartArea } = chart;
+                const yScale = chart.scales.y;
+                c.save();
+
+                // dx/dy: offset from point center to label anchor
+                // Arrows drawn from point edge to label
+                const labels = [
+                    { i: 0, text: 'Athens 471 BCE', dx: 0, dy: -16 },
+                    { i: 1, text: 'Rome ~70 BCE', dx: 0, dy: -16 },
+                    { i: 2, text: 'Poland 1573', dx: 0, dy: 16 },
+                    { i: 3, text: 'Britain 1715', dx: 0, dy: -16 },
+                    { i: 4, text: 'France 1804', dx: -60, dy: 20 },
+                    { i: 5, text: 'France 1848', dx: -45, dy: -5 },
+                    { i: 6, text: 'France 1870', dx: 60, dy: -10 },
+                    { i: 7, text: 'Russia 1917', dx: -40, dy: -20 },
+                    { i: 8, text: 'USSR 1937', dx: 50, dy: 20 },
+                    { i: 9, text: 'USSR 1984', dx: -60, dy: -5 },
+                    { i: 10, text: 'India 1984', dx: -50, dy: -30 },
+                    { i: 11, text: 'India 2014', dx: 40, dy: 40 },
+                    { i: 12, text: 'India 2019', dx: -55, dy: -50 },
+                ];
+
+                labels.forEach(lbl => {
+                    const d = votingData[lbl.i];
+                    if (!d) return;
+                    const px = xScale.getPixelForValue(d.year);
+                    const py = yScale.getPixelForValue(d.voters);
+                    if (px < chartArea.left || px > chartArea.right) return;
+                    if (py < chartArea.top || py > chartArea.bottom) return;
+
+                    const radius = Math.max(6, Math.min(20, Math.sqrt(d.voters)));
+                    const tx = px + lbl.dx;
+                    const ty = py + lbl.dy;
+                    const color = colorMap[d.type].replace('0.8', '0.9');
+
+                    // Draw arrow line from near the point to the label
+                    const dist = Math.sqrt(lbl.dx * lbl.dx + lbl.dy * lbl.dy);
+                    if (dist > 20) {
+                        // Start arrow from edge of point circle
+                        const nx = lbl.dx / dist, ny = lbl.dy / dist;
+                        const startX = px + nx * (radius + 2);
+                        const startY = py + ny * (radius + 2);
+                        // End arrow a few px before the text
+                        const endX = tx - nx * 4;
+                        const endY = ty - ny * 4;
+                        c.strokeStyle = color.replace('0.9', '0.4');
+                        c.lineWidth = 1;
+                        c.beginPath();
+                        c.moveTo(startX, startY);
+                        c.lineTo(endX, endY);
+                        c.stroke();
+                        // Small arrowhead pointing at the circle
+                        const headLen = 5;
+                        const angle = Math.atan2(startY - endY, startX - endX);
+                        c.fillStyle = color.replace('0.9', '0.4');
+                        c.beginPath();
+                        c.moveTo(startX, startY);
+                        c.lineTo(startX - headLen * Math.cos(angle - 0.4), startY - headLen * Math.sin(angle - 0.4));
+                        c.lineTo(startX - headLen * Math.cos(angle + 0.4), startY - headLen * Math.sin(angle + 0.4));
+                        c.closePath();
+                        c.fill();
+                    }
+
+                    // Draw text
+                    c.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+                    c.fillStyle = color;
+                    c.textAlign = 'center';
+                    c.textBaseline = lbl.dy < 0 ? 'bottom' : 'top';
+                    c.fillText(lbl.text, tx, ty);
+                });
+
+                c.restore();
+            }
+        };
+
         // Plugin to draw Dark Ages shaded region
         const darkAgesPlugin = {
             id: 'darkAges',
@@ -646,7 +725,7 @@
         const ctx = document.getElementById('votesChart').getContext('2d');
         let chart = new Chart(ctx, {
             type: 'scatter',
-            plugins: [darkAgesPlugin, errorBarPlugin, intersectionLabelPlugin],
+            plugins: [darkAgesPlugin, errorBarPlugin, pointLabelsPlugin, intersectionLabelPlugin],
             data: { datasets: views.shared.datasets },
             options: {
                 responsive: true,
