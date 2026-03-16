@@ -202,9 +202,9 @@
         ];
 
         // World population data (in millions)
-        // Historical data + UN 2024 revision (to 2100) + UN 2004 long-range medium variant (post-2100)
-        // UN 2024: peaks ~10,300M around 2084, then slow decline
-        // UN 2004 long-range medium: stabilizes ~9,000M by 2300
+        // Historical data + UN WPP 2024 (to 2100) + Raftery & Sevcikova 2023 median (post-2100)
+        // UN WPP 2024: peaks ~10,300M around 2084, then slow decline
+        // Raftery & Sevcikova 2023: declining to ~7,500M by 2300 (sub-replacement fertility)
         const worldPopulation = [
             { year: -500, pop: 100 },
             { year: -200, pop: 150 },
@@ -227,10 +227,10 @@
             { year: 2084, pop: 10300 },
             { year: 2100, pop: 10200 },
             { year: 2120, pop: 10000 },
-            { year: 2150, pop: 9700 },
-            { year: 2200, pop: 9200 },
-            { year: 2250, pop: 9000 },
-            { year: 2300, pop: 9000 },
+            { year: 2150, pop: 9600 },
+            { year: 2200, pop: 8900 },
+            { year: 2250, pop: 8000 },
+            { year: 2300, pop: 7000 },
         ];
 
         // Log-linear regression on all elections after 1500
@@ -395,7 +395,7 @@
                 const padding = 8;
                 const boxW = metrics.width + padding * 2;
                 const boxH = 24;
-                const offsetX = -boxW / 2;
+                const offsetX = -boxW - 10;
                 const offsetY = -30;
                 c.fillStyle = 'rgba(0, 0, 0, 0.8)';
                 c.strokeStyle = '#ff6fff';
@@ -418,7 +418,7 @@
                 c.fillStyle = '#fff';
                 c.textAlign = 'center';
                 c.textBaseline = 'middle';
-                c.fillText(text, px, py + offsetY);
+                c.fillText(text, bx + boxW / 2, py + offsetY);
                 // Draw connector line
                 c.strokeStyle = 'rgba(255, 111, 255, 0.5)';
                 c.lineWidth = 1;
