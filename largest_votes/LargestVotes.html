@@ -163,10 +163,21 @@
             { year: 1870, voters: 9.0, low: 8.85, high: 9.0, label: "French Constitutional", location: "France", type: "democratic" },
             { year: 1917, voters: 44.4, low: 42, high: 47, label: "Russian Constituent Assembly", location: "Russia", type: "democratic" },
             { year: 1937, voters: 93.7, low: 91, high: 93.7, label: "Soviet Election", location: "USSR", type: "controlled" },
-            { year: 1984, voters: 184, low: 183.5, high: 184.5, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1946, voters: 101.5, low: 101, high: 102, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1950, voters: 111.1, low: 111, high: 111.1, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1954, voters: 120.7, low: 120.7, high: 120.8, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1958, voters: 133.8, low: 133.8, high: 133.8, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1962, voters: 140.0, low: 140, high: 140, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1966, voters: 143.9, low: 143.9, high: 144, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1967, voters: 152.7, low: 152, high: 153, label: "Indian General Election", location: "India", type: "democratic" },
+            { year: 1970, voters: 153.2, low: 153.1, high: 153.2, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1974, voters: 161.7, low: 161.7, high: 161.7, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1977, voters: 194.3, low: 194, high: 195, label: "Indian General Election", location: "India", type: "democratic" },
+            { year: 1980, voters: 202.8, low: 202, high: 203, label: "Indian General Election", location: "India", type: "democratic" },
             { year: 1984.5, voters: 256.3, low: 256, high: 256.5, label: "Indian General Election", location: "India", type: "democratic" },
             { year: 2014, voters: 554, low: 553.5, high: 554.5, label: "Indian General Election", location: "India", type: "democratic" },
             { year: 2019, voters: 603.7, low: 603, high: 604.5, label: "Indian General Election", location: "India", type: "democratic" },
+            { year: 2024, voters: 642, low: 640, high: 644, label: "Indian General Election", location: "India", type: "democratic" },
         ];
 
         // World population data (in millions)
@@ -323,13 +334,24 @@
                     { i: 3, text: 'Britain 1715', dx: 0, dy: -16 },
                     { i: 4, text: 'France 1804', dx: -60, dy: 20 },
                     { i: 5, text: 'France 1848', dx: -45, dy: -5 },
-                    { i: 6, text: 'France 1870', dx: 60, dy: -10 },
-                    { i: 7, text: 'Russia 1917', dx: -40, dy: -20 },
-                    { i: 8, text: 'USSR 1937', dx: 50, dy: 20 },
-                    { i: 9, text: 'USSR 1984', dx: -60, dy: -5 },
-                    { i: 10, text: 'India 1984', dx: -50, dy: -30 },
-                    { i: 11, text: 'India 2014', dx: 40, dy: 40 },
-                    { i: 12, text: 'India 2019', dx: -55, dy: -50 },
+                    { i: 6, text: 'France 1870', dx: 60, dy: 10 },
+                    { i: 7, text: 'Russia 1917', dx: -40, dy: 15 },
+                    { i: 8, text: 'USSR \'37', dx: 50, dy: 25 },
+                    { i: 9, text: 'USSR \'46', dx: -70, dy: 20 },
+                    { i: 10, text: 'USSR \'50', dx: -125, dy: 16 },
+                    { i: 11, text: 'USSR \'54', dx: -75, dy: 12 },
+                    { i: 12, text: 'USSR \'58', dx: -95, dy: 0 },
+                    { i: 13, text: 'USSR \'62', dx: -85, dy: -8 },
+                    { i: 14, text: 'USSR \'66', dx: 45, dy: 25 },
+                    { i: 15, text: 'India \'67', dx: -150, dy: -20 },
+                    { i: 16, text: 'USSR \'70', dx: 53, dy: 12 },
+                    { i: 17, text: 'USSR \'74', dx: -95, dy: -20 },
+                    { i: 18, text: 'India \'77', dx: -52, dy: -28 },
+                    { i: 19, text: 'India \'80', dx: 55, dy: 0 },
+                    { i: 20, text: 'India \'84', dx: -85, dy: -65 },
+                    { i: 21, text: 'India 2014', dx: 52, dy: 10 },
+                    { i: 22, text: 'India 2019', dx: -55, dy: -50 },
+                    { i: 23, text: 'India 2024', dx: 55, dy: -40 },
                 ];
 
                 labels.forEach(lbl => {
@@ -381,6 +403,36 @@
                     c.fillText(lbl.text, tx, ty);
                 });
 
+                c.restore();
+            }
+        };
+
+        // Plugin to draw trend line equation
+        const equationPlugin = {
+            id: 'equation',
+            afterDatasetsDraw(chart) {
+                const { ctx: c, scales: { x: xScale, y: yScale }, chartArea } = chart;
+                // Position the label along the trend line, around year 2060
+                const labelYear = 1500;
+                const labelVoters = Math.exp(fitA + fitB * labelYear);
+                const px = xScale.getPixelForValue(labelYear);
+                const py = yScale.getPixelForValue(labelVoters);
+                if (px < chartArea.left || px > chartArea.right) return;
+                if (py < chartArea.top || py > chartArea.bottom) return;
+
+                c.save();
+                const bStr = fitB.toFixed(4);
+                const aStr = fitA.toFixed(2);
+                const doublingTime = (Math.log(2) / fitB).toFixed(0);
+                const line1 = `voters = e^(${bStr} \u00d7 year ${aStr})`;
+                const line2 = `doubling time \u2248 ${doublingTime} years`;
+
+                c.font = 'bold 13px monospace';
+                c.fillStyle = 'rgba(76, 175, 80, 0.6)';
+                c.textAlign = 'right';
+                c.textBaseline = 'bottom';
+                c.fillText(line1, px - 10, py - 4);
+                c.fillText(line2, px - 10, py + 10);
                 c.restore();
             }
         };
@@ -651,7 +703,7 @@
         const ctx = document.getElementById('votesChart').getContext('2d');
         let chart = new Chart(ctx, {
             type: 'scatter',
-            plugins: [darkAgesPlugin, errorBarPlugin, pointLabelsPlugin, intersectionLabelPlugin],
+            plugins: [darkAgesPlugin, errorBarPlugin, pointLabelsPlugin, equationPlugin, intersectionLabelPlugin],
             data: { datasets: views.shared.datasets },
             options: {
                 responsive: true,
