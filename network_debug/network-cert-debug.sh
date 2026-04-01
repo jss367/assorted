@@ -111,7 +111,7 @@ fi
 # 3. DNS resolution check
 header "3. DNS Resolution"
 for host in github.com www.google.com apple.com; do
-    RESOLVED=$(dig +short "$host" 2>/dev/null | head -2 | tr '\n' ' ')
+    RESOLVED=$(dig +short "$host" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -2 | tr '\n' ' ')
     if [ -n "$RESOLVED" ]; then
         ok "$host -> $RESOLVED"
     else
@@ -184,10 +184,11 @@ done
 header "7. HTTPS Connection Tests"
 for url in https://github.com https://www.google.com; do
     echo
-    RESPONSE=$(curl -sI --connect-timeout 5 "$url" 2>&1 | head -1)
-    RESULT=$?
-    if [ $RESULT -eq 0 ]; then
-        ok "$url -> $RESPONSE"
+    RESPONSE=$(curl -sI --connect-timeout 5 "$url" 2>&1)
+    RESULT=${PIPESTATUS[0]:-$?}
+    FIRST_LINE=$(echo "$RESPONSE" | head -1)
+    if [ $RESULT -eq 0 ] && [ -n "$FIRST_LINE" ]; then
+        ok "$url -> $FIRST_LINE"
     else
         err "$url -> FAILED (exit code $RESULT)"
         VERBOSE=$(curl -vI --connect-timeout 5 "$url" 2>&1 | grep -iE "error|certificate|SSL|alert")
