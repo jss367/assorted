@@ -1,5 +1,11 @@
 # NAS Connectivity Lost Again (2026-04-09)
 
+> **Correction added 2026-04-12:** This doc frames the two subnets as both
+> belonging to the eero. That's wrong — `192.168.1.0/24` is the **AT&T
+> ONT's LAN** and `192.168.4.0/22` is the eero LAN. The eero has a WAN IP
+> on the ONT's network and NATs its own LAN. Struck-through items below
+> reflect that. See `Wifi situation.md` for the corrected topology.
+
 ## Symptom
 
 Finder couldn't connect to Synology NAS. Same symptom as 2026-04-06 incident.
@@ -26,8 +32,13 @@ The eero reboot did fix it, but differently than last time:
 
 ## Root cause pattern
 
-The eero network runs (at least) two subnets: `192.168.1.x` and `192.168.4.x`. It
-inconsistently assigns devices to one or the other, and inter-subnet routing is unreliable.
+~~The eero network runs (at least) two subnets: `192.168.1.x` and `192.168.4.x`. It
+inconsistently assigns devices to one or the other, and inter-subnet routing is unreliable.~~
+(Corrected 2026-04-12: the eero runs **one** LAN, `192.168.4.0/22`. The `192.168.1.x`
+network is the **AT&T ONT's LAN**, upstream of the eero. When the Mac lands on
+`.1.x`, it's attached to the ONT side — outside the eero's NAT — and can't reach
+devices on the eero LAN. How the Mac ends up there while showing the eero SSID
+is still unexplained.)
 When the Mac lands on `192.168.1.x/24` and the NAS is on `192.168.4.x`, they can't reach
 each other even though Bonjour (multicast) still works across the boundary.
 
