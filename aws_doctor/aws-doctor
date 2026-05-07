@@ -206,7 +206,12 @@ for p in "${CONFIG_PROFILES[@]}" "${CREDS_PROFILES[@]}"; do
   if [[ "$p" == "$ACTIVE_PROFILE" ]]; then profile_defined=1; break; fi
 done
 if (( profile_defined == 0 )) && [[ "$ACTIVE_PROFILE" != "default" ]]; then
-  err "Profile '$ACTIVE_PROFILE' is selected but not defined in $CONFIG_FILE or $CREDS_FILE"
+  if [[ -n "${AWS_ACCESS_KEY_ID-}" && -n "${AWS_SECRET_ACCESS_KEY-}" ]]; then
+    # Env credentials drive auth in this case, so the missing profile is not a real error.
+    info "Profile '$ACTIVE_PROFILE' isn't defined in any config file, but env credentials are set — auth will use those, not the profile."
+  else
+    err "Profile '$ACTIVE_PROFILE' is selected but not defined in $CONFIG_FILE or $CREDS_FILE"
+  fi
 fi
 
 # Detect SSO config for active profile (literal section-name comparison; see note above)
@@ -368,8 +373,9 @@ fi
 section "Identity check (sts get-caller-identity)"
 
 if ! command -v aws >/dev/null 2>&1; then
-  bad "AWS CLI not installed (or not on PATH). Install it to verify the active credentials work."
+  bad "AWS CLI not installed (or not on PATH)."
   note "macOS: brew install awscli"
+  warn "AWS CLI not installed — credentials were not actually verified with sts get-caller-identity."
 else
   kv "aws version" "$(aws --version 2>&1 | head -1)"
   if out=$(aws sts get-caller-identity --output json 2>&1); then
