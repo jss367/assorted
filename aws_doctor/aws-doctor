@@ -34,6 +34,17 @@ mask() {
   if (( n <= 8 )); then printf '****'; else printf '%s…%s' "${v:0:4}" "${v: -4}"; fi
 }
 
+# Convert ISO-8601 UTC timestamp (e.g. 2024-01-01T12:34:56Z, fractional seconds OK)
+# to epoch seconds. Works on both BSD/macOS and GNU/Linux `date`. Prints nothing on failure.
+iso_to_epoch() {
+  local s="$1"
+  local stripped="${s%Z}"
+  stripped="${stripped%%.*}"
+  date -j -u -f "%Y-%m-%dT%H:%M:%S" "$stripped" "+%s" 2>/dev/null && return 0
+  date -u -d "$s" "+%s" 2>/dev/null && return 0
+  return 1
+}
+
 # ---------- 1. Environment variables ----------
 section "Environment variables"
 
@@ -164,12 +175,19 @@ elif [[ -n "${AWS_DEFAULT_REGION-}" ]]; then
   ACTIVE_REGION="$AWS_DEFAULT_REGION"; REGION_SRC="AWS_DEFAULT_REGION"
 fi
 if [[ -z "$ACTIVE_REGION" && -f "$CONFIG_FILE" ]]; then
-  # Pull region from the active profile section
-  section_header="\\[(profile )?${ACTIVE_PROFILE}\\]"
-  ACTIVE_REGION=$(awk -v hdr="$section_header" '
-    $0 ~ "^\\[" { in_sect = ($0 ~ hdr) ? 1 : 0; next }
+  # Pull region from the active profile section. Section names are compared as
+  # literal strings (not regex) so profile names containing dots, dashes, etc.
+  # cannot accidentally match other sections.
+  ACTIVE_REGION=$(awk -v active="$ACTIVE_PROFILE" '
+    /^\[/ {
+      hdr = $0
+      sub(/^\[/, "", hdr); sub(/\][[:space:]]*$/, "", hdr)
+      sub(/^profile[[:space:]]+/, "", hdr)
+      in_sect = (hdr == active) ? 1 : 0
+      next
+    }
     in_sect && /^[[:space:]]*region[[:space:]]*=/ {
-      sub(/^[[:space:]]*region[[:space:]]*=[[:space:]]*/,"")
+      sub(/^[[:space:]]*region[[:space:]]*=[[:space:]]*/, "")
       print; exit
     }
   ' "$CONFIG_FILE")
@@ -191,27 +209,44 @@ if (( profile_defined == 0 )) && [[ "$ACTIVE_PROFILE" != "default" ]]; then
   err "Profile '$ACTIVE_PROFILE' is selected but not defined in $CONFIG_FILE or $CREDS_FILE"
 fi
 
-# Detect SSO config for active profile
+# Detect SSO config for active profile (literal section-name comparison; see note above)
 if [[ -f "$CONFIG_FILE" ]] && (( profile_defined == 1 )); then
-  hdr="\\[(profile )?${ACTIVE_PROFILE}\\]"
-  sso_session=$(awk -v hdr="$hdr" '
-    $0 ~ "^\\[" { in_sect = ($0 ~ hdr) ? 1 : 0; next }
-    in_sect && /^[[:space:]]*sso_(session|start_url|account_id|role_name)[[:space:]]*=/ { print; }
+  sso_session=$(awk -v active="$ACTIVE_PROFILE" '
+    /^\[/ {
+      hdr = $0
+      sub(/^\[/, "", hdr); sub(/\][[:space:]]*$/, "", hdr)
+      sub(/^profile[[:space:]]+/, "", hdr)
+      in_sect = (hdr == active) ? 1 : 0
+      next
+    }
+    in_sect && /^[[:space:]]*sso_(session|start_url|account_id|role_name)[[:space:]]*=/ { print }
   ' "$CONFIG_FILE")
   if [[ -n "$sso_session" ]]; then
     kv "auth type" "SSO"
     note "$(printf '%s' "$sso_session" | sed 's/^/    /')"
   fi
-  source_profile=$(awk -v hdr="$hdr" '
-    $0 ~ "^\\[" { in_sect = ($0 ~ hdr) ? 1 : 0; next }
+  source_profile=$(awk -v active="$ACTIVE_PROFILE" '
+    /^\[/ {
+      hdr = $0
+      sub(/^\[/, "", hdr); sub(/\][[:space:]]*$/, "", hdr)
+      sub(/^profile[[:space:]]+/, "", hdr)
+      in_sect = (hdr == active) ? 1 : 0
+      next
+    }
     in_sect && /^[[:space:]]*source_profile[[:space:]]*=/ {
-      sub(/^[[:space:]]*source_profile[[:space:]]*=[[:space:]]*/,""); print; exit
+      sub(/^[[:space:]]*source_profile[[:space:]]*=[[:space:]]*/, ""); print; exit
     }
   ' "$CONFIG_FILE")
-  role_arn=$(awk -v hdr="$hdr" '
-    $0 ~ "^\\[" { in_sect = ($0 ~ hdr) ? 1 : 0; next }
+  role_arn=$(awk -v active="$ACTIVE_PROFILE" '
+    /^\[/ {
+      hdr = $0
+      sub(/^\[/, "", hdr); sub(/\][[:space:]]*$/, "", hdr)
+      sub(/^profile[[:space:]]+/, "", hdr)
+      in_sect = (hdr == active) ? 1 : 0
+      next
+    }
     in_sect && /^[[:space:]]*role_arn[[:space:]]*=/ {
-      sub(/^[[:space:]]*role_arn[[:space:]]*=[[:space:]]*/,""); print; exit
+      sub(/^[[:space:]]*role_arn[[:space:]]*=[[:space:]]*/, ""); print; exit
     }
   ' "$CONFIG_FILE")
   if [[ -n "$role_arn" ]]; then
@@ -256,8 +291,7 @@ fi
 
 # Credential expiration in the past?
 if [[ -n "${AWS_CREDENTIAL_EXPIRATION-}" ]]; then
-  # Expect ISO-8601, e.g. 2024-01-01T12:34:56Z
-  if exp_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${AWS_CREDENTIAL_EXPIRATION%%.*}" "+%s" 2>/dev/null); then
+  if exp_epoch=$(iso_to_epoch "$AWS_CREDENTIAL_EXPIRATION"); then
     now_epoch=$(date "+%s")
     if (( exp_epoch < now_epoch )); then
       err "AWS_CREDENTIAL_EXPIRATION is in the past ($AWS_CREDENTIAL_EXPIRATION) — credentials are expired."
@@ -265,6 +299,8 @@ if [[ -n "${AWS_CREDENTIAL_EXPIRATION-}" ]]; then
       remaining=$(( (exp_epoch - now_epoch) / 60 ))
       info "AWS credentials expire in ~${remaining} minute(s) (at $AWS_CREDENTIAL_EXPIRATION)."
     fi
+  else
+    warn "AWS_CREDENTIAL_EXPIRATION='$AWS_CREDENTIAL_EXPIRATION' could not be parsed as ISO-8601 — cannot tell if expired."
   fi
 fi
 
@@ -311,7 +347,7 @@ if [[ -d "$SSO_CACHE_DIR" ]]; then
     # Try to extract expiresAt without jq
     exp=$(grep -o '"expiresAt"[[:space:]]*:[[:space:]]*"[^"]*"' "$f" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
     if [[ -n "$exp" ]]; then
-      if exp_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${exp%%.*}" "+%s" 2>/dev/null); then
+      if exp_epoch=$(iso_to_epoch "$exp"); then
         now_epoch=$(date "+%s")
         if (( exp_epoch < now_epoch )); then expired=$((expired+1)); else valid=$((valid+1)); fi
       fi
