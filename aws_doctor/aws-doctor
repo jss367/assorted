@@ -34,14 +34,39 @@ mask() {
   if (( n <= 8 )); then printf '****'; else printf '%s…%s' "${v:0:4}" "${v: -4}"; fi
 }
 
-# Convert ISO-8601 UTC timestamp (e.g. 2024-01-01T12:34:56Z, fractional seconds OK)
-# to epoch seconds. Works on both BSD/macOS and GNU/Linux `date`. Prints nothing on failure.
+# Convert ISO-8601 timestamp to epoch seconds. Works on BSD/macOS and GNU/Linux.
+# Accepts the common variants AWS tools emit:
+#   2024-01-01T12:34:56Z
+#   2024-01-01T12:34:56.789Z       (fractional seconds)
+#   2024-01-01T12:34:56+00:00      (RFC 3339 offset, e.g. aws-vault)
+#   2024-01-01T12:34:56-05:00
+#   2024-01-01T12:34:56 UTC
+#   2024-01-01T12:34:56            (no suffix → assume UTC)
+# Prints nothing on failure.
 iso_to_epoch() {
   local s="$1"
-  local stripped="${s%Z}"
-  stripped="${stripped%%.*}"
-  date -j -u -f "%Y-%m-%dT%H:%M:%S" "$stripped" "+%s" 2>/dev/null && return 0
+  # GNU date can parse all of the above directly, so try it first when available.
   date -u -d "$s" "+%s" 2>/dev/null && return 0
+
+  # BSD/macOS date needs a single explicit format. Normalize input so we can use
+  # "%Y-%m-%dT%H:%M:%S%z" (where %z expects ±HHMM with no colon).
+  local n="$s"
+  # Strip fractional seconds: 12:34:56.789Z -> 12:34:56Z
+  if [[ "$n" =~ ^(.*[0-9]{2}:[0-9]{2}:[0-9]{2})\.[0-9]+(.*)$ ]]; then
+    n="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
+  fi
+  # Trailing Z or " UTC" -> drop it (we'll append +0000 below)
+  n="${n%Z}"
+  n="${n% UTC}"
+  # +HH:MM / -HH:MM offset -> +HHMM / -HHMM (BSD %z does not accept the colon)
+  if [[ "$n" =~ ^(.*)([+-])([0-9]{2}):([0-9]{2})$ ]]; then
+    n="${BASH_REMATCH[1]}${BASH_REMATCH[2]}${BASH_REMATCH[3]}${BASH_REMATCH[4]}"
+  fi
+  # No offset suffix at all? Assume UTC.
+  if [[ ! "$n" =~ [+-][0-9]{4}$ ]]; then
+    n="${n}+0000"
+  fi
+  date -j -u -f "%Y-%m-%dT%H:%M:%S%z" "$n" "+%s" 2>/dev/null && return 0
   return 1
 }
 
