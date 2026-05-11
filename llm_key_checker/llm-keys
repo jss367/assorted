@@ -396,24 +396,33 @@ class Finding:
     note: str | None = None  # any comment text the user wrote next to the key
 
 
+# Google's AIza key format is shared across every Google API (Maps, Translate,
+# YouTube, Sheets, ...). When we match it by pattern but the env-var name
+# clearly points to a non-Gemini Google product, don't claim it's a Gemini key.
+_GOOGLE_NON_GEMINI = (
+    "MAPS", "PLACES", "ROUTES", "DIRECTIONS", "GEOCODING",
+    "TRANSLATE", "YOUTUBE", "DRIVE", "SHEETS", "DOCS", "CALENDAR",
+    "GMAIL", "ANALYTICS", "TAG_MANAGER", "RECAPTCHA", "OAUTH",
+    "CLOUD_VISION", "SPEECH", "STORAGE", "FIRESTORE", "PUBSUB",
+)
+
+
 def classify(value: str, var_name: str | None) -> str:
     """Return a Provider.name or 'Unknown'."""
     # Strongest signal: env-var name matches a known provider var exactly.
     if var_name and var_name in PROVIDER_BY_ENV_VAR:
         return PROVIDER_BY_ENV_VAR[var_name].name
-    # Next: value-prefix pattern. Iterate in PROVIDERS order so more specific
-    # patterns (sk-ant-, sk-or-) win over generic ones (sk-).
+    # Value-pattern match (PROVIDERS order: specific prefixes first).
     for p in PROVIDERS:
         for pat in p.value_patterns:
             if pat.fullmatch(value):
+                if p.name == "Google Gemini" and var_name:
+                    if any(d in var_name.upper() for d in _GOOGLE_NON_GEMINI):
+                        return "Unknown"
                 return p.name
-    # Last: env-var name contains a known provider name.
-    if var_name:
-        low = var_name.lower()
-        for p in PROVIDERS:
-            tag = p.name.lower().split()[0].split("/")[0].rstrip(")")
-            if tag in low:
-                return p.name
+    # Note: no fuzzy substring fallback on var name. It was too loose
+    # (GOOGLE_MAPS_API_KEY → Gemini, etc.). Anything not classified above is
+    # still reported under "Unclassified" with its var name visible.
     return "Unknown"
 
 
@@ -609,13 +618,17 @@ def from_env_files(extra_paths: Iterable[Path] = ()) -> list[Finding]:
         if p.exists():
             scan_file(p)
 
-    # User-supplied extras: a file is scanned directly; a directory is walked
-    # one level deep for the usual env-file names.
+    # User-supplied extras: a file is scanned directly; a directory has its
+    # own .env files checked AND its immediate child dirs walked (so
+    # --paths /my/project picks up both /my/project/.env and
+    # /my/project/sub/.env).
     extra_roots: list[Path] = []
     for p in extra_paths:
         if p.is_file():
             scan_file(p)
         elif p.is_dir():
+            for env_name in (".env", ".envrc", ".env.local"):
+                scan_file(p / env_name)
             extra_roots.append(p)
 
     # Walk common project roots one level deep, then look for .env/.envrc.
