@@ -486,11 +486,32 @@ def _clean_note(raw: list[str]) -> str | None:
     return "\n".join(kept)
 
 
+# Fallback masker for providers with no specific value pattern (Mistral,
+# DeepSeek, Cohere — their key shapes are too generic to use for
+# classification, but we still don't want a stale key in a prose comment to
+# print verbatim). Matches runs of 24+ key-shaped chars that contain at least
+# one letter AND one digit, which excludes English prose without much fuss.
+_GENERIC_KEY_LIKE = re.compile(r"[A-Za-z0-9_\-]{24,}")
+
+
 def _mask_keys_in_text(text: str) -> str:
-    """Replace any substring matching a known provider key pattern with a mask."""
+    """Replace any substring that looks like a key with a masked preview."""
+
+    def _mask(m: re.Match) -> str:
+        s = m.group(0)
+        return s[:8] + "…" + s[-4:] if len(s) > 12 else s[:4] + "…"
+
     for p in PROVIDERS:
         for pat in p.value_patterns:
-            text = pat.sub(lambda m: m.group(0)[:8] + "…" + m.group(0)[-4:], text)
+            text = pat.sub(_mask, text)
+
+    def _maybe_mask_generic(m: re.Match) -> str:
+        s = m.group(0)
+        if any(c.isalpha() for c in s) and any(c.isdigit() for c in s):
+            return _mask(m)
+        return s
+
+    text = _GENERIC_KEY_LIKE.sub(_maybe_mask_generic, text)
     return text
 
 
@@ -661,7 +682,11 @@ def from_keychain() -> list[Finding]:
     for p in PROVIDERS:
         for svc in p.keychain_services:
             value = _keychain_lookup(svc)
-            if value and _looks_like_key(svc, value):
+            # Provider attribution is already authoritative (the Keychain entry
+            # is keyed by a service name we wrote into the provider table), so
+            # we skip _looks_like_key — it would drop valid keys for providers
+            # without value patterns (Mistral, DeepSeek, Cohere).
+            if value and 16 <= len(value) <= 400 and not any(c in value for c in " \t\n"):
                 out.append(Finding(p.name, None, value, f"keychain:{svc}"))
     return out
 
