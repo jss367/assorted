@@ -29,6 +29,8 @@ DeepSeek, Together, Hugging Face, Replicate, Cohere, Perplexity, Fireworks.
 - if probing is on: whether the key authenticates, plus whatever the provider
   exposes for free — number of accessible models, account/org/user name,
   OpenRouter usage/limit, Hugging Face username + orgs + token role, etc.
+  Perplexity is intentionally not probed (no free metadata endpoint, and
+  every authenticated call is billable).
 
 ## Where it looks
 

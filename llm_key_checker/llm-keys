@@ -212,27 +212,9 @@ def probe_cohere(key: str) -> dict:
     return {"ok": False, "status": status, "detail": _err(data)}
 
 
-def probe_perplexity(key: str) -> dict:
-    # Perplexity has no free metadata endpoint; do a 1-token chat call so we
-    # can at least confirm auth. Picks the cheapest stable model.
-    body = json.dumps(
-        {
-            "model": "sonar",
-            "messages": [{"role": "user", "content": "."}],
-            "max_tokens": 1,
-        }
-    ).encode()
-    req = urllib.request.Request(
-        "https://api.perplexity.ai/chat/completions",
-        data=body,
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
-            return {"ok": resp.status == 200, "status": resp.status}
-    except urllib.error.HTTPError as e:
-        return {"ok": False, "status": e.code, "detail": _err_bytes(e.read() if e.fp else b"")}
+# Perplexity has no free metadata endpoint — every authenticated request is
+# a billable chat completion. We deliberately don't probe Perplexity keys;
+# discovery and reporting still work, the probe slot just stays empty.
 
 
 def probe_fireworks(key: str) -> dict:
@@ -363,7 +345,7 @@ PROVIDERS: list[Provider] = [
         "Perplexity",
         env_vars=("PERPLEXITY_API_KEY", "PPLX_API_KEY"),
         value_patterns=(re.compile(r"pplx-[A-Za-z0-9]{40,}"),),
-        probe=probe_perplexity,
+        probe=None,  # no free metadata endpoint; would burn user credit
         keychain_services=("perplexity", "PERPLEXITY_API_KEY"),
     ),
     Provider(
@@ -436,6 +418,11 @@ def _looks_like_key(name: str, value: str) -> bool:
     if not value or len(value) < 16 or len(value) > 400:
         return False
     if any(c in value for c in " \t\n"):
+        return False
+    # Shell indirections and command substitutions ($VAR, ${VAR}, $(cmd),
+    # `cmd`) aren't real key material — rejecting them prevents misleading
+    # "probe rejected" output on .env files that forward via expansion.
+    if "$" in value or "`" in value:
         return False
     name_u = name.upper()
     if name_u in PROVIDER_BY_ENV_VAR:
@@ -873,6 +860,12 @@ def _render_probe(rec: KeyRecord, s: Style) -> str:
         return f"{s.red}probe failed:{s.reset} {rec.probe_error}"
     r = rec.probe_result
     if r is None:
+        # Reached when probing is on but this provider has probe=None
+        # (e.g. Perplexity — no free metadata endpoint, so we don't
+        # spend the user's credit just to authenticate).
+        p = PROVIDER_BY_NAME.get(rec.provider)
+        if p is not None and p.probe is None:
+            return f"{s.dim}probe: skipped (no free metadata endpoint){s.reset}"
         return f"{s.dim}probe: skipped{s.reset}"
     if not r.get("ok"):
         status = r.get("status")
