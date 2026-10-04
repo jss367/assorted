@@ -105,7 +105,7 @@ def test_map_export_includes_original_source_bibliography(tmp_path):
     assert 'Original sources' in html
 
 
-@pytest.mark.parametrize("error", [OSError("unavailable"), ValueError("unreadable workbook"), source.BadZipFile("bad workbook")])
+@pytest.mark.parametrize("error", [OSError("unavailable"), ValueError("unreadable workbook"), ImportError("missing Excel engine"), source.BadZipFile("bad workbook")])
 def test_maddison_failure_preserves_world_bank_only_generation(monkeypatch, error):
     monkeypatch.setattr(source.pd, "read_excel", Mock(side_effect=error))
     monkeypatch.setattr(source, "fetch_world_bank_population", lambda _: [{"year": 2025, "population": 100}])
