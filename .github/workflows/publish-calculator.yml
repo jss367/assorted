@@ -1,0 +1,47 @@
+name: Publish calculators
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'investments/**'
+      - 'rent-versus-buy/**'
+      - '.github/workflows/publish-calculator.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Prepare site with calculator subdirectories
+        run: |
+          mkdir -p "$RUNNER_TEMP/pages-site"
+          cp -R investments "$RUNNER_TEMP/pages-site/investments"
+          mkdir -p "$RUNNER_TEMP/pages-site/rent-versus-buy"
+          cp rent-versus-buy/index.html "$RUNNER_TEMP/pages-site/rent-versus-buy/index.html"
+      - name: Upload calculators
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/pages-site
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

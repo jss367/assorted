@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Largest Votes in History</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #00dbde, #fc00ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .subtitle {
+            text-align: center;
+            color: #b8b8b8;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .chart-container {
+            position: relative;
+            height: 600px;
+            margin-bottom: 40px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 15px;
+            padding: 20px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .info-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .info-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+        .info-card h3 {
+            color: #00dbde;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        .info-card p {
+            color: #d0d0d0;
+            line-height: 1.6;
+            margin: 5px 0;
+        }
+        .highlight {
+            color: #fc00ff;
+            font-weight: bold;
+        }
+        .legend {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .legend span {
+            margin: 0 15px;
+            font-size: 0.9em;
+        }
+        .democratic {
+            color: #4CAF50;
+        }
+        .controlled {
+            color: #ff6b6b;
+        }
+        .mixed {
+            color: #ffd93d;
+        }
+        .view-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .view-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ccc;
+            padding: 8px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s ease;
+        }
+        .view-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+        }
+        .view-btn.active {
+            background: rgba(0, 219, 222, 0.2);
+            border-color: #00dbde;
+            color: #00dbde;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>The Evolution of Mass Voting Through History</h1>
+        <p class="subtitle">From Ancient Athens to Modern Democracies: The Largest Votes Ever Recorded</p>
+        
+        <div class="legend">
+            <span class="democratic">● Democratic Elections</span>
+            <span class="controlled">● Controlled/One-Party Elections</span>
+            <span class="mixed">● Mixed/Restricted Franchise</span>
+            <span style="color: rgba(0, 191, 255, 0.8)">● World Population</span>
+            <span style="color: rgba(76, 175, 80, 0.5)">┅ Vote Trend / Projection</span>
+        </div>
+        
+        <div class="view-controls">
+            <button class="view-btn active" data-view="shared">All Time</button>
+            <button class="view-btn" data-view="early-modern">Early Modern (1500+)</button>
+            <button class="view-btn" data-view="modern">Modern Era (1800+)</button>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="votesChart"></canvas>
+        </div>
+        
+    </div>
+
+    <script>
+        // Data for the chart
+        const votingData = [
+            { year: -471, voters: 0.0085, low: 0.006, high: 0.01, label: "Athens Ostracism", location: "Athens", type: "democratic" },
+            { year: -70, voters: 0.05, low: 0.02, high: 0.07, label: "Roman Republic", location: "Rome", type: "mixed" },
+            { year: 1573, voters: 0.04, low: 0.04, high: 0.05, label: "Polish Royal Election", location: "Poland", type: "mixed" },
+            { year: 1715, voters: 0.25, low: 0.2, high: 0.3, label: "British General Election", location: "Britain", type: "mixed" },
+            { year: 1804, voters: 3.52, low: 3.0, high: 3.52, label: "French Empire Plebiscite", location: "France", type: "controlled" },
+            { year: 1848, voters: 7.5, low: 7.3, high: 7.8, label: "French Presidential", location: "France", type: "democratic" },
+            { year: 1870, voters: 9.0, low: 8.85, high: 9.0, label: "French Constitutional", location: "France", type: "democratic" },
+            { year: 1917, voters: 44.4, low: 42, high: 47, label: "Russian Constituent Assembly", location: "Russia", type: "democratic" },
+            { year: 1937, voters: 93.7, low: 91, high: 93.7, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1946, voters: 101.5, low: 101, high: 102, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1950, voters: 111.1, low: 111, high: 111.1, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1954, voters: 120.7, low: 120.7, high: 120.8, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1958, voters: 133.8, low: 133.8, high: 133.8, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1962, voters: 140.0, low: 140, high: 140, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1966, voters: 143.9, low: 143.9, high: 144, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1967, voters: 152.7, low: 152, high: 153, label: "Indian General Election", location: "India", type: "democratic" },
+            { year: 1970, voters: 153.2, low: 153.1, high: 153.2, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1974, voters: 161.7, low: 161.7, high: 161.7, label: "Soviet Election", location: "USSR", type: "controlled" },
+            { year: 1977, voters: 194.3, low: 194, high: 195, label: "Indian General Election", location: "India", type: "democratic" },
+            { year: 1980, voters: 202.8, low: 202, high: 203, label: "Indian General Election", location: "India", type: "democratic" },
+            { year: 1984.5, voters: 256.3, low: 256, high: 256.5, label: "Indian General Election", location: "India", type: "democratic" },
+            { year: 2014, voters: 554, low: 553.5, high: 554.5, label: "Indian General Election", location: "India", type: "democratic" },
+            { year: 2019, voters: 615, low: 614, high: 616, label: "Indian General Election", location: "India", type: "democratic" },
+            { year: 2024, voters: 642, low: 640, high: 644, label: "Indian General Election", location: "India", type: "democratic" },
+        ];
+
+        // World population data (in millions)
+        // Historical data + UN WPP 2024 (to 2100) + Raftery & Sevcikova 2023 median (post-2100)
+        // UN WPP 2024: peaks ~10,300M around 2084, then slow decline
+        // Raftery & Sevcikova 2023: declining to ~7,500M by 2300 (sub-replacement fertility)
+        const worldPopulation = [
+            { year: -500, pop: 100 },
+            { year: -200, pop: 150 },
+            { year: 1, pop: 300 },
+            { year: 500, pop: 200 },
+            { year: 1000, pop: 310 },
+            { year: 1500, pop: 500 },
+            { year: 1600, pop: 580 },
+            { year: 1700, pop: 600 },
+            { year: 1800, pop: 1000 },
+            { year: 1850, pop: 1260 },
+            { year: 1900, pop: 1650 },
+            { year: 1950, pop: 2500 },
+            { year: 1975, pop: 4000 },
+            { year: 2000, pop: 6100 },
+            { year: 2020, pop: 7800 },
+            { year: 2030, pop: 8500 },
+            { year: 2050, pop: 9700 },
+            { year: 2060, pop: 10000 },
+            { year: 2084, pop: 10300 },
+            { year: 2100, pop: 10200 },
+            { year: 2120, pop: 10000 },
+            { year: 2150, pop: 9600 },
+            { year: 2200, pop: 8900 },
+            { year: 2250, pop: 8000 },
+            { year: 2300, pop: 7000 },
+        ];
+
+        // Log-linear regression on all elections after 1500
+        function fitVoteTrend() {
+            const keyPoints = votingData.filter(d => d.year >= 1500);
+            const n = keyPoints.length;
+            const sumX = keyPoints.reduce((s, p) => s + p.year, 0);
+            const sumLnY = keyPoints.reduce((s, p) => s + Math.log(p.voters), 0);
+            const sumXLnY = keyPoints.reduce((s, p) => s + p.year * Math.log(p.voters), 0);
+            const sumX2 = keyPoints.reduce((s, p) => s + p.year * p.year, 0);
+            const b = (n * sumXLnY - sumX * sumLnY) / (n * sumX2 - sumX * sumX);
+            const a = (sumLnY - b * sumX) / n;
+            return { a, b };
+        }
+
+        const { a: fitA, b: fitB } = fitVoteTrend();
+
+        // Interpolate world population at any year
+        function getWorldPop(y) {
+            for (let i = 0; i < worldPopulation.length - 1; i++) {
+                const p1 = worldPopulation[i], p2 = worldPopulation[i + 1];
+                if (y >= p1.year && y <= p2.year) {
+                    const t = (y - p1.year) / (p2.year - p1.year);
+                    return p1.pop + t * (p2.pop - p1.pop);
+                }
+            }
+            // Beyond last data point, hold flat
+            return worldPopulation[worldPopulation.length - 1].pop;
+        }
+
+        // Find precise intersection year
+        function findIntersection() {
+            for (let y = 2020; y <= 2300; y++) {
+                const vote = Math.exp(fitA + fitB * y);
+                const pop = getWorldPop(y);
+                if (vote >= pop) {
+                    // Binary search for more precision within this year
+                    let lo = y - 1, hi = y;
+                    for (let i = 0; i < 20; i++) {
+                        const mid = (lo + hi) / 2;
+                        if (Math.exp(fitA + fitB * mid) >= getWorldPop(mid)) hi = mid;
+                        else lo = mid;
+                    }
+                    const iy = Math.round((lo + hi) / 2);
+                    return { year: iy, pop: Math.round(getWorldPop(iy)) };
+                }
+            }
+            return null;
+        }
+        const intersection = findIntersection();
+
+        // Build trend line through historical data AND projected forward
+        const projectionEnd = intersection ? intersection.year : 2100;
+        const trendLineStart = 1500; // start where the fit becomes meaningful
+        const projectedVotes = [];
+        // Historical portion of the trend line (solid will be styled differently)
+        for (let y = trendLineStart; y <= projectionEnd; y += 5) {
+            projectedVotes.push({ x: y, y: Math.exp(fitA + fitB * y) });
+        }
+        // Ensure the intersection point itself is included
+        if (intersection && projectedVotes[projectedVotes.length - 1].x < intersection.year) {
+            projectedVotes.push({ x: intersection.year, y: Math.exp(fitA + fitB * intersection.year) });
+        }
+        // Split into historical fit and future projection for different styling
+        const trendHistorical = projectedVotes.filter(p => p.x <= 2019);
+        const trendProjected = projectedVotes.filter(p => p.x >= 2019);
+
+        // Color mapping for vote types
+        const colorMap = {
+            democratic: 'rgba(76, 175, 80, 0.8)',
+            controlled: 'rgba(255, 107, 107, 0.8)',
+            mixed: 'rgba(255, 217, 61, 0.8)'
+        };
+
+        // Error bar plugin
+        const errorBarPlugin = {
+            id: 'errorBars',
+            afterDatasetsDraw(chart) {
+                const { ctx: c, scales: { x: xScale, y: yScale } } = chart;
+                const dataset = chart.data.datasets[0];
+                c.save();
+                c.lineWidth = 2;
+                const capWidth = 6;
+                votingData.forEach((d, i) => {
+                    if (d.low === d.high && d.low === d.voters) return;
+                    const px = xScale.getPixelForValue(d.year);
+                    const pyLow = yScale.getPixelForValue(d.low);
+                    const pyHigh = yScale.getPixelForValue(d.high);
+                    c.strokeStyle = colorMap[d.type].replace('0.8', '0.5');
+                    c.beginPath();
+                    c.moveTo(px, pyLow);
+                    c.lineTo(px, pyHigh);
+                    c.stroke();
+                    // caps
+                    c.beginPath();
+                    c.moveTo(px - capWidth, pyLow);
+                    c.lineTo(px + capWidth, pyLow);
+                    c.stroke();
+                    c.beginPath();
+                    c.moveTo(px - capWidth, pyHigh);
+                    c.lineTo(px + capWidth, pyHigh);
+                    c.stroke();
+                });
+                c.restore();
+            }
+        };
+
+        // Plugin to draw point labels with arrows
+        const pointLabelsPlugin = {
+            id: 'pointLabels',
+            afterDatasetsDraw(chart) {
+                const { ctx: c, scales: { x: xScale }, chartArea } = chart;
+                const yScale = chart.scales.y;
+                c.save();
+
+                // dx/dy: offset from point center to label anchor
+                // Arrows drawn from point edge to label
+                const labels = [
+                    { i: 0, text: 'Athens 471 BCE', dx: 0, dy: -16 },
+                    { i: 1, text: 'Rome ~70 BCE', dx: 0, dy: -16 },
+                    { i: 2, text: 'Poland 1573', dx: 0, dy: 16 },
+                    { i: 3, text: 'Britain 1715', dx: 0, dy: -16 },
+                    { i: 4, text: 'France 1804', dx: -60, dy: 20 },
+                    { i: 5, text: 'France 1848', dx: -45, dy: -5 },
+                    { i: 6, text: 'France 1870', dx: 60, dy: 10 },
+                    { i: 7, text: 'Russia 1917', dx: -40, dy: 15 },
+                    { i: 8, text: 'USSR \'37', dx: 50, dy: 25 },
+                    { i: 9, text: 'USSR \'46', dx: -70, dy: 20 },
+                    { i: 10, text: 'USSR \'50', dx: -125, dy: 16 },
+                    { i: 11, text: 'USSR \'54', dx: -75, dy: 12 },
+                    { i: 12, text: 'USSR \'58', dx: -95, dy: 0 },
+                    { i: 13, text: 'USSR \'62', dx: -85, dy: -8 },
+                    { i: 14, text: 'USSR \'66', dx: 45, dy: 25 },
+                    { i: 15, text: 'India \'67', dx: -150, dy: -20 },
+                    { i: 16, text: 'USSR \'70', dx: 53, dy: 12 },
+                    { i: 17, text: 'USSR \'74', dx: -95, dy: -20 },
+                    { i: 18, text: 'India \'77', dx: -52, dy: -28 },
+                    { i: 19, text: 'India \'80', dx: 55, dy: 0 },
+                    { i: 20, text: 'India \'84', dx: -85, dy: -65 },
+                    { i: 21, text: 'India 2014', dx: 52, dy: 10 },
+                    { i: 22, text: 'India 2019', dx: -55, dy: -50 },
+                    { i: 23, text: 'India 2024', dx: 55, dy: -40 },
+                ];
+
+                labels.forEach(lbl => {
+                    const d = votingData[lbl.i];
+                    if (!d) return;
+                    const px = xScale.getPixelForValue(d.year);
+                    const py = yScale.getPixelForValue(d.voters);
+                    if (px < chartArea.left || px > chartArea.right) return;
+                    if (py < chartArea.top || py > chartArea.bottom) return;
+
+                    const radius = Math.max(6, Math.min(20, Math.sqrt(d.voters)));
+                    const tx = px + lbl.dx;
+                    const ty = py + lbl.dy;
+                    const color = colorMap[d.type].replace('0.8', '0.9');
+
+                    // Draw arrow line from near the point to the label
+                    const dist = Math.sqrt(lbl.dx * lbl.dx + lbl.dy * lbl.dy);
+                    if (dist > 20) {
+                        // Start arrow from edge of point circle
+                        const nx = lbl.dx / dist, ny = lbl.dy / dist;
+                        const startX = px + nx * (radius + 2);
+                        const startY = py + ny * (radius + 2);
+                        // End arrow a few px before the text
+                        const endX = tx - nx * 4;
+                        const endY = ty - ny * 4;
+                        c.strokeStyle = color.replace('0.9', '0.4');
+                        c.lineWidth = 1;
+                        c.beginPath();
+                        c.moveTo(startX, startY);
+                        c.lineTo(endX, endY);
+                        c.stroke();
+                        // Small arrowhead pointing at the circle
+                        const headLen = 5;
+                        const angle = Math.atan2(startY - endY, startX - endX);
+                        c.fillStyle = color.replace('0.9', '0.4');
+                        c.beginPath();
+                        c.moveTo(startX, startY);
+                        c.lineTo(startX - headLen * Math.cos(angle - 0.4), startY - headLen * Math.sin(angle - 0.4));
+                        c.lineTo(startX - headLen * Math.cos(angle + 0.4), startY - headLen * Math.sin(angle + 0.4));
+                        c.closePath();
+                        c.fill();
+                    }
+
+                    // Draw text
+                    c.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+                    c.fillStyle = color;
+                    c.textAlign = 'center';
+                    c.textBaseline = lbl.dy < 0 ? 'bottom' : 'top';
+                    c.fillText(lbl.text, tx, ty);
+                });
+
+                c.restore();
+            }
+        };
+
+        // Plugin to draw trend line equation
+        const equationPlugin = {
+            id: 'equation',
+            afterDatasetsDraw(chart) {
+                const { ctx: c, scales: { x: xScale, y: yScale }, chartArea } = chart;
+                // Position the label along the trend line, around year 2060
+                const labelYear = 1500;
+                const labelVoters = Math.exp(fitA + fitB * labelYear);
+                const px = xScale.getPixelForValue(labelYear);
+                const py = yScale.getPixelForValue(labelVoters);
+                if (px < chartArea.left || px > chartArea.right) return;
+                if (py < chartArea.top || py > chartArea.bottom) return;
+
+                c.save();
+                const bStr = fitB.toFixed(4);
+                const aStr = fitA.toFixed(2);
+                const doublingTime = (Math.log(2) / fitB).toFixed(0);
+                const line1 = `voters = e^(${bStr} \u00d7 year ${aStr})`;
+                const line2 = `doubling time \u2248 ${doublingTime} years`;
+
+                c.font = 'bold 13px monospace';
+                c.fillStyle = 'rgba(76, 175, 80, 0.6)';
+                c.textAlign = 'right';
+                c.textBaseline = 'bottom';
+                c.fillText(line1, px - 10, py - 4);
+                c.fillText(line2, px - 10, py + 10);
+                c.restore();
+            }
+        };
+
+        // Plugin to draw Dark Ages shaded region
+        const darkAgesPlugin = {
+            id: 'darkAges',
+            beforeDatasetsDraw(chart) {
+                const { ctx: c, scales: { x: xScale, y: yScale }, chartArea } = chart;
+                const x1 = xScale.getPixelForValue(476);   // Fall of Western Rome
+                const x2 = xScale.getPixelForValue(1453);  // Fall of Constantinople
+                if (x2 < chartArea.left || x1 > chartArea.right) return;
+                const left = Math.max(x1, chartArea.left);
+                const right = Math.min(x2, chartArea.right);
+                c.save();
+                // Shaded region
+                c.fillStyle = 'rgba(100, 80, 120, 0.15)';
+                c.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
+                // Border lines
+                c.strokeStyle = 'rgba(180, 160, 200, 0.3)';
+                c.lineWidth = 1;
+                c.setLineDash([4, 4]);
+                c.beginPath();
+                c.moveTo(left, chartArea.top);
+                c.lineTo(left, chartArea.bottom);
+                c.moveTo(right, chartArea.top);
+                c.lineTo(right, chartArea.bottom);
+                c.stroke();
+                c.setLineDash([]);
+                // Label
+                const cx = (left + right) / 2;
+                c.font = 'italic 13px -apple-system, BlinkMacSystemFont, sans-serif';
+                c.fillStyle = 'rgba(200, 180, 220, 0.7)';
+                c.textAlign = 'center';
+                c.textBaseline = 'top';
+                c.fillText('Dark Ages / Medieval Period', cx, chartArea.top + 8);
+                c.font = 'italic 11px -apple-system, BlinkMacSystemFont, sans-serif';
+                c.fillStyle = 'rgba(200, 180, 220, 0.5)';
+                c.fillText('476 – 1453 CE', cx, chartArea.top + 26);
+                c.restore();
+            }
+        };
+
+        // Plugin to draw intersection label
+        const intersectionLabelPlugin = {
+            id: 'intersectionLabel',
+            afterDatasetsDraw(chart) {
+                if (!intersection) return;
+                const { ctx: c, scales: { x: xScale } } = chart;
+                const yScale = chart.scales.y2 || chart.scales.y;
+                const px = xScale.getPixelForValue(intersection.year);
+                const py = yScale.getPixelForValue(intersection.pop);
+                c.save();
+                // Draw label background
+                const popBillions = (intersection.pop / 1000).toFixed(1);
+                const text = `~${intersection.year} CE / ${popBillions}B people`;
+                c.font = 'bold 13px -apple-system, BlinkMacSystemFont, sans-serif';
+                const metrics = c.measureText(text);
+                const padding = 8;
+                const boxW = metrics.width + padding * 2;
+                const boxH = 24;
+                const offsetX = -boxW - 10;
+                const offsetY = -30;
+                c.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                c.strokeStyle = '#ff6fff';
+                c.lineWidth = 2;
+                const bx = px + offsetX, by = py + offsetY - boxH / 2, r = 6;
+                c.beginPath();
+                c.moveTo(bx + r, by);
+                c.lineTo(bx + boxW - r, by);
+                c.arcTo(bx + boxW, by, bx + boxW, by + r, r);
+                c.lineTo(bx + boxW, by + boxH - r);
+                c.arcTo(bx + boxW, by + boxH, bx + boxW - r, by + boxH, r);
+                c.lineTo(bx + r, by + boxH);
+                c.arcTo(bx, by + boxH, bx, by + boxH - r, r);
+                c.lineTo(bx, by + r);
+                c.arcTo(bx, by, bx + r, by, r);
+                c.closePath();
+                c.fill();
+                c.stroke();
+                // Draw text
+                c.fillStyle = '#fff';
+                c.textAlign = 'center';
+                c.textBaseline = 'middle';
+                c.fillText(text, bx + boxW / 2, py + offsetY);
+                // Draw connector line
+                c.strokeStyle = 'rgba(255, 111, 255, 0.5)';
+                c.lineWidth = 1;
+                c.beginPath();
+                c.moveTo(px, py + offsetY + boxH / 2);
+                c.lineTo(px, py - 10);
+                c.stroke();
+                c.restore();
+            }
+        };
+
+        // --- Reusable dataset builders ---
+        function makeVotersDataset(yAxisID) {
+            return {
+                label: 'Number of Voters',
+                data: votingData.map(d => ({ x: d.year, y: d.voters, label: d.label, location: d.location })),
+                backgroundColor: votingData.map(d => colorMap[d.type]),
+                borderColor: votingData.map(d => colorMap[d.type]),
+                borderWidth: 2,
+                pointRadius: votingData.map(d => Math.max(6, Math.min(20, Math.sqrt(d.voters)))),
+                pointHoverRadius: votingData.map(d => Math.max(8, Math.min(25, Math.sqrt(d.voters) + 2))),
+                yAxisID: yAxisID || 'y',
+                order: 0
+            };
+        }
+        function makePopDataset(yAxisID) {
+            return {
+                label: 'World Population',
+                data: worldPopulation.filter(d => d.year <= projectionEnd + 20).map(d => ({ x: d.year, y: d.pop })),
+                type: 'line',
+                borderColor: 'rgba(0, 191, 255, 0.8)',
+                backgroundColor: 'rgba(0, 191, 255, 0.1)',
+                borderWidth: 3,
+                pointRadius: 3,
+                pointBackgroundColor: 'rgba(0, 191, 255, 0.8)',
+                fill: false,
+                tension: 0.3,
+                yAxisID: yAxisID || 'y',
+                order: 1
+            };
+        }
+        function makeTrendHistoricalDataset(yAxisID) {
+            return {
+                label: 'Trend Line (historical fit)',
+                data: trendHistorical,
+                type: 'line',
+                borderColor: 'rgba(76, 175, 80, 0.3)',
+                borderWidth: 2,
+                borderDash: [4, 3],
+                pointRadius: 0,
+                fill: false,
+                tension: 0.3,
+                yAxisID: yAxisID || 'y',
+                order: 3
+            };
+        }
+        function makeProjectionDataset(yAxisID) {
+            return {
+                label: 'Projected Largest Vote (trend)',
+                data: trendProjected,
+                type: 'line',
+                borderColor: 'rgba(76, 175, 80, 0.5)',
+                borderWidth: 2,
+                borderDash: [8, 4],
+                pointRadius: 0,
+                fill: false,
+                tension: 0.3,
+                yAxisID: yAxisID || 'y',
+                order: 2
+            };
+        }
+        function makeIntersectionDataset(yAxisID) {
+            if (!intersection) return null;
+            return {
+                label: 'Intersection',
+                data: [{ x: intersection.year, y: intersection.pop }],
+                type: 'scatter',
+                backgroundColor: '#ff6fff',
+                borderColor: '#fff',
+                borderWidth: 2,
+                pointRadius: 10,
+                pointStyle: 'star',
+                pointHoverRadius: 14,
+                yAxisID: yAxisID || 'y',
+                order: -1
+            };
+        }
+
+        // --- Shared options ---
+        const xTickCallback = function(value) {
+            return value < 0 ? Math.abs(value) + ' BCE' : value + ' CE';
+        };
+        const yTickCallback = function(value) {
+            if (value >= 1000) return (value / 1000).toFixed(value >= 10000 ? 0 : 1) + 'B';
+            if (value >= 1) return value + 'M';
+            if (value >= 0.001) return (value * 1000) + 'K';
+            return value;
+        };
+        const tooltipCallback = {
+            label: function(context) {
+                const dsLabel = context.dataset.label;
+                if (dsLabel === 'Intersection' && intersection) {
+                    const popB = (intersection.pop / 1000).toFixed(1);
+                    return [`Intersection: ~${intersection.year} CE`, `Population: ${popB} billion`];
+                }
+                if (dsLabel === 'World Population') {
+                    return `World Population: ${context.parsed.y.toLocaleString()}M`;
+                }
+                if (dsLabel === 'Projected Largest Vote (trend)' || dsLabel === 'Trend Line (historical fit)') {
+                    return `Vote Trend: ${Math.round(context.parsed.y).toLocaleString()}M`;
+                }
+                const point = votingData[context.dataIndex];
+                if (!point) return '';
+                const fmt = v => v >= 1 ? v.toFixed(1) + 'M' : (v * 1000000).toLocaleString();
+                const lines = [`${point.label}`, `Location: ${point.location}`, `Voters: ${fmt(point.voters)}`];
+                if (point.low !== point.high) lines.push(`Range: ${fmt(point.low)} – ${fmt(point.high)}`);
+                return lines;
+            }
+        };
+
+        // --- View configurations ---
+        const views = {
+            shared: {
+                datasets: [makeVotersDataset(), makePopDataset(), makeTrendHistoricalDataset(), makeProjectionDataset(), makeIntersectionDataset()].filter(Boolean),
+                scales: {
+                    x: {
+                        type: 'linear', position: 'bottom',
+                        max: 2200,
+                        title: { display: true, text: 'Year', color: '#fff', font: { size: 14 } },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                        ticks: { color: '#fff', callback: xTickCallback }
+                    },
+                    y: {
+                        type: 'logarithmic', position: 'left',
+                        title: { display: true, text: 'People (millions, log scale)', color: '#fff', font: { size: 14 } },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                        ticks: { color: '#fff', callback: yTickCallback }
+                    }
+                }
+            },
+            'early-modern': {
+                datasets: [makeVotersDataset(), makePopDataset(), makeTrendHistoricalDataset(), makeProjectionDataset(), makeIntersectionDataset()].filter(Boolean),
+                scales: {
+                    x: {
+                        type: 'linear', position: 'bottom',
+                        min: 1500,
+                        max: 2200,
+                        title: { display: true, text: 'Year', color: '#fff', font: { size: 14 } },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                        ticks: { color: '#fff', callback: xTickCallback }
+                    },
+                    y: {
+                        type: 'logarithmic', position: 'left',
+                        title: { display: true, text: 'People (millions, log scale)', color: '#fff', font: { size: 14 } },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                        ticks: { color: '#fff', callback: yTickCallback }
+                    }
+                }
+            },
+            modern: {
+                datasets: [makeVotersDataset(), makePopDataset(), makeTrendHistoricalDataset(), makeProjectionDataset(), makeIntersectionDataset()].filter(Boolean),
+                scales: {
+                    x: {
+                        type: 'linear', position: 'bottom',
+                        min: 1800,
+                        max: 2200,
+                        title: { display: true, text: 'Year', color: '#fff', font: { size: 14 } },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                        ticks: { color: '#fff', callback: xTickCallback }
+                    },
+                    y: {
+                        type: 'logarithmic', position: 'left',
+                        title: { display: true, text: 'People (millions, log scale)', color: '#fff', font: { size: 14 } },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                        ticks: { color: '#fff', callback: yTickCallback }
+                    }
+                }
+            },
+        };
+
+        // --- Create chart ---
+        let currentView = 'shared';
+        const ctx = document.getElementById('votesChart').getContext('2d');
+        let chart = new Chart(ctx, {
+            type: 'scatter',
+            plugins: [darkAgesPlugin, errorBarPlugin, pointLabelsPlugin, equationPlugin, intersectionLabelPlugin],
+            data: { datasets: views.shared.datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false,
+                        labels: {
+                            color: '#fff',
+                            filter: function(item) {
+                                return item.text !== 'Number of Voters' && item.text !== 'Intersection' && item.text !== 'Trend Line (historical fit)';
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: tooltipCallback,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff', bodyColor: '#fff',
+                        borderColor: '#fff', borderWidth: 1,
+                        padding: 12, displayColors: false
+                    }
+                },
+                scales: views.shared.scales,
+                animation: { duration: 800, easing: 'easeInOutQuart' }
+            }
+        });
+
+        // --- View switching ---
+        function switchView(viewName) {
+            if (!views[viewName]) return;
+            currentView = viewName;
+            const v = views[viewName];
+            chart.data.datasets = v.datasets;
+            // Remove all existing scales, then apply new ones
+            Object.keys(chart.options.scales).forEach(k => { delete chart.options.scales[k]; });
+            Object.assign(chart.options.scales, v.scales);
+            chart.update();
+            // Update button states
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === viewName);
+            });
+        }
+
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', () => switchView(btn.dataset.view));
+        });
+
+        // Display intersection info
+    </script>
+</body>
+</html>

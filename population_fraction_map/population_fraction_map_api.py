@@ -213,6 +213,13 @@ COUNTRIES = [
     "Vatican City",
 ]
 
+COUNTRIES = [
+    "United States",
+    "China",
+    "India",
+    "Ireland",
+]
+
 
 def get_country_iso3_mapping() -> Dict[str, str]:
     """Explicit ISO3 identifiers for every configured country."""

@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Robo-Advisor Comparison Calculator</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --card-border: #2a2d3a;
+    --text: #e4e4e7;
+    --text-muted: #9ca3af;
+    --accent: #6366f1;
+    --accent-light: #818cf8;
+    --green: #22c55e;
+    --green-bg: rgba(34, 197, 94, 0.1);
+    --red: #ef4444;
+    --red-bg: rgba(239, 68, 68, 0.1);
+    --yellow: #eab308;
+    --yellow-bg: rgba(234, 179, 8, 0.1);
+    --robinhood: #00c805;
+    --wealthfront: #3d55df;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 2rem;
+  }
+
+  /* Slider Section */
+  .slider-section {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .slider-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .slider-wrapper {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--card-border);
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 3px solid var(--bg);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  .amount-input-wrapper {
+    position: relative;
+  }
+
+  .amount-input-wrapper::before {
+    content: '$';
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  .amount-input {
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem 0.5rem 1.75rem;
+    border-radius: 8px;
+    width: 160px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .amount-input:focus {
+    border-color: var(--accent);
+  }
+
+  .tax-select-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .tax-select {
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .tax-select:focus {
+    border-color: var(--accent);
+  }
+
+  /* Deep Dive Section */
+  .deep-dive {
+    margin-bottom: 2rem;
+  }
+
+  .deep-dive h2 {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+  }
+
+  .vs-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  @media (max-width: 640px) {
+    .vs-container { grid-template-columns: 1fr; }
+  }
+
+  .vs-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: relative;
+  }
+
+  .vs-card.wealthfront { border-top: 3px solid var(--wealthfront); }
+  .vs-card.robinhood { border-top: 3px solid var(--robinhood); }
+
+  .vs-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 99px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .badge-current {
+    background: var(--yellow-bg);
+    color: var(--yellow);
+  }
+
+  .badge-recommended {
+    background: var(--green-bg);
+    color: var(--green);
+  }
+
+  .vs-card .description {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+
+  .stat-grid {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  .stat:last-child { border-bottom: none; }
+
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .stat-value {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .stat-value.green { color: var(--green); }
+  .stat-value.red { color: var(--red); }
+  .stat-value.yellow { color: var(--yellow); }
+
+  /* Savings Banner */
+  .savings-banner {
+    background: var(--green-bg);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+
+  .savings-banner .big-number {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--green);
+    line-height: 1.2;
+  }
+
+  .savings-banner .savings-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  /* Comparison Details */
+  .comparison-details {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .comparison-details h3 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .detail-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--card-border);
+    font-size: 0.85rem;
+  }
+
+  .detail-row:last-child { border-bottom: none; }
+
+  .detail-row.header {
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+  }
+
+  .detail-row .winner {
+    color: var(--green);
+    font-weight: 600;
+  }
+
+  .detail-row .loser {
+    color: var(--text-muted);
+  }
+
+  /* Full Comparison Table */
+  .table-section h2 {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid var(--card-border);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    font-size: 0.85rem;
+  }
+
+  thead th {
+    background: rgba(99, 102, 241, 0.08);
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  tbody td {
+    padding: 0.85rem 1rem;
+    border-top: 1px solid var(--card-border);
+    white-space: nowrap;
+  }
+
+  tbody tr:hover {
+    background: rgba(99, 102, 241, 0.04);
+  }
+
+  tbody tr.best-row {
+    background: var(--green-bg);
+  }
+
+  tbody tr.best-row:hover {
+    background: rgba(34, 197, 94, 0.15);
+  }
+
+  .platform-name {
+    font-weight: 600;
+  }
+
+  .tlh-yes { color: var(--green); }
+  .tlh-no { color: var(--text-muted); }
+  .tlh-limited { color: var(--yellow); }
+
+  .five-year-cost {
+    font-weight: 700;
+  }
+
+  /* Notes section */
+  .notes {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  .notes h3 {
+    color: var(--text);
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .notes ul {
+    padding-left: 1.25rem;
+  }
+
+  .notes li {
+    margin-bottom: 0.35rem;
+  }
+
+  .promo-alert {
+    background: var(--yellow-bg);
+    border: 1px solid rgba(234, 179, 8, 0.25);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    color: var(--yellow);
+    margin-bottom: 1.5rem;
+    text-align: center;
+    font-weight: 500;
+  }
+
+  /* Platform Picker */
+  .pick-btn {
+    padding: 0.4rem 0.9rem;
+    border-radius: 99px;
+    border: 1px solid var(--card-border);
+    background: var(--card);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .pick-btn:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .pick-btn.selected {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .pick-btn.selected:nth-of-type(1) { background: var(--accent); border-color: var(--accent); }
+
+  .footnote {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Robo-Advisor Comparison Calculator</h1>
+  <p class="subtitle">Compare the true cost of automated investing — fees, tax benefits, and transfer bonuses</p>
+
+  <!-- Portfolio Input -->
+  <div class="slider-section">
+    <span class="slider-label">Portfolio Value</span>
+    <div class="slider-wrapper">
+      <input type="range" id="slider" min="10000" max="5000000" step="10000" value="1000000">
+    </div>
+    <div class="amount-input-wrapper">
+      <input type="text" id="amountInput" class="amount-input" value="1,000,000">
+    </div>
+    <div class="tax-select-wrapper">
+      <label class="slider-label" for="taxRate">Tax Rate</label>
+      <select id="taxRate" class="tax-select">
+        <option value="0.22">22%</option>
+        <option value="0.24">24%</option>
+        <option value="0.32">32%</option>
+        <option value="0.35">35%</option>
+        <option value="0.37" selected>37%</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Promo Alert -->
+  <div class="promo-alert" id="promoAlert">
+    Robinhood HOOD Rewards 2% transfer bonus ends March 25, 2026 &mdash; <span id="daysLeft"></span> days left
+  </div>
+
+  <!-- Full Comparison Table -->
+  <div class="table-section">
+    <h2>All Platforms Compared</h2>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+      This table includes <strong>everything</strong>: fees, estimated tax benefits from TLH and direct indexing,
+      and transfer bonuses. The "5-Year Net" column is your true bottom line.
+    </p>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Annual Fee</th>
+            <th>TLH Type</th>
+            <th>Est. TLH Benefit/yr</th>
+            <th>Direct Indexing/yr</th>
+            <th>Transfer Bonus</th>
+            <th>5-Year Net Benefit</th>
+          </tr>
+        </thead>
+        <tbody id="comparisonTable"></tbody>
+      </table>
+    </div>
+    <p class="footnote">* Schwab's $0 fee comes with a mandatory cash allocation (6.9%-15% depending on risk profile) that creates performance drag. The drag estimate uses 8% cash and a 2.6% equity-vs-cash return gap from Schwab's own 10-year forecast &mdash; your actual drag will vary. The SEC settled with Schwab in 2022 over setting cash levels based on revenue needs rather than client outcomes.</p>
+    <p class="footnote">** Transfer bonuses reflect current promotions as of March 2026 and may expire. Robinhood 2% promo ends 3/25/2026.</p>
+    <p class="footnote">*** TLH and direct indexing estimates use your selected tax rate. Estimates use midpoint of research ranges.</p>
+    <p class="footnote">**** TLH and DI estimates may partially overlap. Wealthfront's reported harvesting yield (~1.5%) may include portfolios with direct indexing enabled. Actual combined benefit may be lower than the sum shown. Public's DI product subsumes TLH &mdash; no separate TLH line is shown to avoid double-counting.</p>
+  </div>
+
+  <!-- Platform Comparison (Dynamic) -->
+  <div class="deep-dive">
+    <h2>Side-by-Side Comparison</h2>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Select two platforms to compare side by side.</p>
+
+    <div id="platformPicker" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem;"></div>
+
+    <div id="vsCards" class="vs-container"></div>
+    <div id="savingsBanner"></div>
+    <div id="featureComparison"></div>
+    <div id="fullPicture"></div>
+
+    <!-- Educational sections (always visible) -->
+    <div class="comparison-details" style="margin-top: 1.5rem;">
+      <h3>Understanding Robinhood Gold &amp; Strategies</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.7;">
+        <strong>Robinhood Gold</strong> ($5/mo or $50/yr) is a premium subscription:
+        higher APY on uninvested cash, lower margin rates, and capped advisory fees on managed accounts.
+      </p>
+      <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.7; margin-top: 0.75rem;">
+        <strong>Robinhood Strategies</strong> (launched 2025) is the robo-advisor product: automated portfolios
+        across US large-cap, mid-cap, small-cap, international, emerging markets, and bonds. Accounts under $500
+        use ETFs only; $500+ may use ETFs and individual stocks. You need <strong>both</strong> Gold + Strategies
+        for the $250 fee cap. Without Gold, it's a standard 0.25%. On fees alone, Gold + Strategies wins above
+        ~$120K thanks to the cap — but the full picture depends on TLH frequency, direct indexing, and
+        transfer bonuses. See the comparison table above for your actual bottom line.
+      </p>
+    </div>
+
+    <div class="comparison-details">
+      <h3>Daily vs Annual Tax-Loss Harvesting</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.7;">
+        Per J.P. Morgan, daily monitoring provides about <strong>0.30% additional annualized tax savings</strong>
+        vs monthly. The gap vs annual is larger since annual misses mid-year dips (e.g., S&amp;P 500 down 10%
+        mid-2011 but finished up 2%).
+      </p>
+      <div style="background: var(--bg); border-radius: 8px; padding: 1rem; margin-top: 0.75rem;">
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Estimated TLH value on your portfolio:</div>
+        <div style="display: flex; gap: 2rem; margin-top: 0.5rem; flex-wrap: wrap;">
+          <div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Daily</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--green);" id="tlh-daily-value">$5,550/yr</div>
+          </div>
+          <div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Annual</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--yellow);" id="tlh-annual-value">$2,960/yr</div>
+          </div>
+          <div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Difference</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--accent-light);" id="tlh-frequency-value">$2,590/yr</div>
+          </div>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">Based on ~1.5% harvesting yield (daily) vs ~0.8% (annual), at <span id="tlh-tax-rate">37%</span> tax rate</div>
+      </div>
+    </div>
+
+    <div class="comparison-details">
+      <h3>What Is Direct Indexing?</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.7;">
+        Instead of buying an index ETF, direct indexing buys <strong>individual stocks</strong> to replicate an index.
+        You can sell individual losers even when the overall index is up, creating more tax-loss harvesting opportunities.
+        Research estimates <strong>0.5-1.0% additional pre-tax alpha</strong> per year &mdash; but only on the
+        <strong>U.S. stock sleeve</strong> of your portfolio, not the whole thing.
+      </p>
+      <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.7; margin-top: 0.75rem;">
+        <strong>Wealthfront</strong> bundles DI into its standard 0.25% robo-advisor fee for accounts over $100K,
+        but it only applies to the U.S. equity portion (~40% of a diversified portfolio).
+        <strong>Public</strong> offers a pure direct-index product at 0.19% where 100% of assets are direct-indexed.
+        Schwab, Fidelity, and Vanguard offer DI as separate products (not in their robo-advisors) at 0.40%+.
+      </p>
+      <div style="background: var(--bg); border-radius: 8px; padding: 1rem; margin-top: 0.75rem;">
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Estimated DI value (Wealthfront, ~40% US sleeve):</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--green);" id="direct-indexing-value">$1,110/yr</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;" id="di-rate-note">0.75% &times; 40% US sleeve &times; 37% tax rate = ~0.11% whole-portfolio benefit</div>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--yellow); line-height: 1.7; margin-top: 0.75rem;">
+        <strong>Caveat:</strong> Estimates use your selected tax rate and assume gains to offset. Benefits are front-loaded
+        and represent tax <em>deferral</em>, not elimination. TLH and DI estimates may partially overlap (see footnotes).
+      </p>
+    </div>
+  </div>
+
+  <!-- Transfer Bonuses -->
+  <div class="table-section" style="margin-top: 2rem;">
+    <h2>Transfer Bonuses</h2>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+      Most brokerages offer cash bonuses to lure your assets. Some are robo-advisors, others are just brokerages
+      (you'd manage your own portfolio). All have hold requirements.
+    </p>
+    <div style="background: var(--bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
+      <strong style="color: var(--text);">What is a hold period?</strong> When a brokerage gives you a transfer bonus,
+      they require you to keep your assets in their account for a minimum time (the "hold period"). If you withdraw
+      before the hold period ends, you forfeit the bonus (and may need to pay it back). A 5-year hold means you're
+      committing to stay for 5 years. This is how brokerages ensure they recoup the cost of the bonus through
+      ongoing revenue from your account.
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Type</th>
+            <th>Bonus</th>
+            <th>Hold Period</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="bonusTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="notes">
+    <h3>Assumptions & Notes</h3>
+    <ul>
+      <li><strong>TLH does NOT require itemizing deductions.</strong> Capital losses offset capital gains directly on your tax return, regardless of whether you take the standard deduction or itemize. Up to $3,000 in net losses can also offset ordinary income per year, with unlimited carryforward.</li>
+      <li>Annual costs include advisory fees only. ETF expense ratios (typically 0.03-0.15%) apply to all platforms and are excluded for fair comparison.</li>
+      <li><strong>TLH methodology:</strong> Daily TLH estimates use ~1.5% annual harvesting yield (per Wealthfront's reported data) multiplied by your selected tax rate. Annual TLH uses ~0.8% harvesting yield (model estimate; less published data available than for daily). Example at 37%: daily = ~0.55%, annual = ~0.30%. The daily-vs-annual gap is consistent with J.P. Morgan's finding of ~0.30% additional tax savings from daily vs monthly monitoring. Direct indexing benefit uses 0.75% pre-tax alpha (midpoint of 0.5-1.0% from Aperio/Vanguard research), applied only to the U.S. equity sleeve (~40% for diversified robos like Wealthfront, 100% for pure DI products like Public), then scaled by your tax rate. Public&rsquo;s DI product includes TLH inherently &mdash; no separate TLH line is shown to avoid double-counting.</li>
+      <li>TLH benefits are estimates that vary significantly based on market conditions, your tax bracket, and how long you've held the account. Benefits tend to be front-loaded and represent tax <em>deferral</em>, not elimination. All estimates use the tax rate selected above.</li>
+      <li>Transfer bonuses typically require keeping assets in the account for a specified period (usually 5 years for Robinhood and Public).</li>
+      <li>Betterment's pricing is tiered: $5/mo ($60/yr) for balances under $24K without $200/mo recurring deposits; 0.25% for $24K-$1M; 0.15% for $1M-$2M; 0.10% above $2M. The calculator uses these tiers.</li>
+      <li>Vanguard Digital Advisor's gross fee is 0.20%, but credits typically bring the net fee to ~0.15% for all-index portfolios. We use the ~0.15% net figure.</li>
+      <li>"DIY" assumes buying 2-3 broad index ETFs (e.g., VTI + VXUS + BND) at a no-fee brokerage like Fidelity or Schwab, with no automated rebalancing or TLH.</li>
+      <li>Robinhood Gold is only cheaper than Wealthfront on pure advisory fees above ~$120K. Below that, the $50/yr Gold subscription plus the uncapped 0.25% fee makes Robinhood slightly more expensive. (At $120K: both cost $300/yr. Above that, Robinhood's $250 cap kicks in.)</li>
+      <li>All data sourced from platform websites and financial review sites as of March 2026.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const slider = document.getElementById('slider');
+const amountInput = document.getElementById('amountInput');
+const promoAlert = document.getElementById('promoAlert');
+
+// End of March 25 (inclusive — promo runs through the full day)
+const promoEnd = new Date(2026, 2, 25, 23, 59, 59);
+const today = new Date();
+const daysLeft = Math.max(0, Math.ceil((promoEnd - today) / (1000 * 60 * 60 * 24)));
+document.getElementById('daysLeft').textContent = daysLeft;
+if (daysLeft <= 0) promoAlert.style.display = 'none';
+
+function formatCurrency(n) {
+  if (n < 0) return '-$' + Math.abs(Math.round(n)).toLocaleString();
+  return '$' + Math.round(n).toLocaleString();
+}
+function formatRate(n) { return (n * 100).toFixed(2) + '%'; }
+function parseCurrency(str) { return parseInt(str.replace(/[^0-9]/g, ''), 10) || 0; }
+
+const taxRateSelect = document.getElementById('taxRate');
+function getTaxRate() { return parseFloat(taxRateSelect.value); }
+function getTlhAnnual() { return 0.008 * getTaxRate(); }
+function getTlhDaily() { return 0.015 * getTaxRate(); }
+const DI_PRETAX_ALPHA = 0.0075; // 0.75% midpoint of 0.5-1.0% range (Aperio/Vanguard research)
+const US_SLEEVE_ROBO = 0.40;    // ~40% U.S. equity sleeve in diversified robo portfolio
+const US_SLEEVE_PURE_DI = 1.0;  // 100% for pure direct-index products (e.g., Public)
+function getDiBenefit(sleeve = 0) { return DI_PRETAX_ALPHA * sleeve * getTaxRate(); }
+
+// Rich platform definitions
+const PLATFORM_DEFS = {
+  wealthfront: {
+    id: 'wealthfront', name: 'Wealthfront', color: '#3d55df',
+    desc: 'Dedicated robo-advisor with daily TLH and direct indexing ($100K+). Diversified ETF portfolios across US, international, bonds, real estate.',
+    feeCalc: p => p * 0.0025,
+    feeLabel: '0.25%',
+    cashDragCalc: () => 0,
+    tlhType: 'Daily + DI', tlhClass: 'tlh-yes', tlhLabel: 'Daily',
+    tlhCalc: p => p * getTlhDaily(),
+    diLabel: 'Yes ($100K+, US sleeve)', diCalc: p => p >= 100000 ? p * getDiBenefit(US_SLEEVE_ROBO) : 0,
+    bonusCalc: () => 0, bonusLabel: 'None',
+    hysa: '3.30% APY', minimum: '$500', rebalancing: 'Yes',
+    portfolio: 'Diversified ETFs + DI',
+  },
+  robinhood: {
+    id: 'robinhood', name: 'Robinhood Gold', color: '#00c805',
+    desc: 'Robinhood Strategies robo-advisor with Gold subscription. Fee capped at $250/yr for Gold members. ETFs + individual stocks at $500+.',
+    feeCalc: p => Math.min(p * 0.0025, 250) + 50,
+    feeLabel: '0.25% (capped $250) + $50 Gold',
+    cashDragCalc: () => 0,
+    tlhType: 'Annual', tlhClass: 'tlh-limited', tlhLabel: 'Annual (year-end)',
+    tlhCalc: p => p * getTlhAnnual(),
+    diLabel: 'No', diCalc: () => 0,
+    bonusCalc: p => daysLeft > 0 ? p * 0.02 : 0,
+    bonusLabel: daysLeft > 0 ? '2% (HOOD Rewards promo)' : 'None',
+    hysa: '3.35% APY (Gold)', minimum: '$50', rebalancing: 'Yes',
+    portfolio: 'ETFs + individual stocks',
+  },
+  vanguard: {
+    id: 'vanguard', name: 'Vanguard Digital', color: '#c6203e',
+    desc: 'Vanguard\'s automated advisor. Low fees (~0.15% net after credits). Daily TLH. Uses Vanguard index funds.',
+    feeCalc: p => p * 0.0015,
+    feeLabel: '~0.15% net (0.20% gross)',
+    cashDragCalc: () => 0,
+    tlhType: 'Daily', tlhClass: 'tlh-yes', tlhLabel: 'Daily',
+    tlhCalc: p => p * getTlhDaily(),
+    diLabel: 'No (advisor-only)', diCalc: () => 0,
+    bonusCalc: () => 0, bonusLabel: 'None',
+    hysa: 'N/A', minimum: '$100', rebalancing: 'Yes',
+    portfolio: 'Vanguard index funds',
+  },
+  schwab: {
+    id: 'schwab', name: 'Schwab Intelligent*', color: '#00a3e0',
+    desc: '$0 advisory fee but mandatory cash allocation (6.9-15%) creates performance drag. TLH for accounts $50K+.',
+    feeCalc: () => 0,
+    feeLabel: '$0 (+ cash drag)',
+    cashDragCalc: p => p * 0.08 * 0.026,
+    tlhType: 'Daily ($50K+)', tlhClass: 'tlh-yes', tlhLabel: 'Daily ($50K+)',
+    tlhCalc: p => p >= 50000 ? p * getTlhDaily() : 0,
+    diLabel: 'Separate product (0.40%)', diCalc: () => 0,
+    bonusCalc: () => 0, bonusLabel: 'None',
+    hysa: 'N/A', minimum: '$5,000', rebalancing: 'Yes',
+    portfolio: 'Schwab ETFs + cash',
+  },
+  betterment: {
+    id: 'betterment', name: 'Betterment', color: '#1d6ceb',
+    desc: 'Goal-based robo-advisor with daily TLH. Tiered pricing: $5/mo under $24K, 0.25% up to $1M, 0.15% $1M-$2M, 0.10% above $2M.',
+    feeCalc: p => p < 24000 ? 60 : (p <= 1000000 ? p * 0.0025 : p <= 2000000 ? 1000000 * 0.0025 + (p - 1000000) * 0.0015 : 1000000 * 0.0025 + 1000000 * 0.0015 + (p - 2000000) * 0.001),
+    feeLabel: '0.25% ($24K-$1M)',
+    cashDragCalc: () => 0,
+    tlhType: 'Daily', tlhClass: 'tlh-yes', tlhLabel: 'Daily',
+    tlhCalc: p => p * getTlhDaily(),
+    diLabel: 'On the roadmap', diCalc: () => 0,
+    bonusCalc: () => 0, bonusLabel: 'None',
+    hysa: 'N/A', minimum: '$0', rebalancing: 'Yes',
+    portfolio: 'Diversified ETFs',
+  },
+  fidelity: {
+    id: 'fidelity', name: 'Fidelity Go', color: '#4a8c3f',
+    desc: 'Fidelity\'s robo-advisor. 0.35% fee for $25K+ (free below). TLH for $25K+ taxable accounts. Uses Fidelity Flex funds (0% ER).',
+    feeCalc: p => p >= 25000 ? p * 0.0035 : 0,
+    feeLabel: '0.35% ($25K+)',
+    cashDragCalc: () => 0,
+    tlhType: 'Daily ($25K+)', tlhClass: 'tlh-yes', tlhLabel: 'Daily ($25K+)',
+    tlhCalc: p => p >= 25000 ? p * getTlhDaily() : 0,
+    diLabel: 'Separate product (0.40%)', diCalc: () => 0,
+    bonusCalc: () => 0, bonusLabel: 'None',
+    hysa: 'N/A', minimum: '$10', rebalancing: 'Yes',
+    portfolio: 'Fidelity Flex funds',
+  },
+  publicdi: {
+    id: 'publicdi', name: 'Public Direct Index', color: '#6c5ce7',
+    desc: 'Pure direct-indexing product — not a diversified robo-advisor. Buys individual stocks to replicate an index with automated TLH. DI benefit applies to 100% of assets.',
+    feeCalc: p => p * 0.0019,
+    feeLabel: '0.19%',
+    cashDragCalc: () => 0,
+    tlhType: 'Included in DI', tlhClass: 'tlh-yes', tlhLabel: 'Included in DI',
+    tlhCalc: () => 0,
+    diLabel: 'Yes (100%)', diCalc: p => p * getDiBenefit(US_SLEEVE_PURE_DI),
+    bonusCalc: p => p * 0.01, bonusLabel: '1% (5-yr hold)',
+    hysa: 'N/A', minimum: '$1,000', rebalancing: 'N/A',
+    portfolio: 'Individual US stocks (index replication)',
+  },
+  diy: {
+    id: 'diy', name: 'DIY (VTI+VXUS)', color: '#9ca3af',
+    desc: 'Buy 2-3 broad index ETFs yourself at a free brokerage. No advisory fee, no automated TLH or rebalancing.',
+    feeCalc: () => 0,
+    feeLabel: 'Free',
+    cashDragCalc: () => 0,
+    tlhType: 'Manual', tlhClass: 'tlh-no', tlhLabel: 'Manual (DIY)',
+    tlhCalc: () => 0,
+    diLabel: 'No', diCalc: () => 0,
+    bonusCalc: () => 0, bonusLabel: 'None',
+    hysa: 'N/A', minimum: '$0', rebalancing: 'Manual',
+    portfolio: 'Your choice of ETFs',
+  },
+};
+
+const PLATFORM_IDS = Object.keys(PLATFORM_DEFS);
+let selectedPlatforms = ['wealthfront', 'robinhood'];
+
+function calcPlatform(id, portfolio) {
+  const d = PLATFORM_DEFS[id];
+  const fee = d.feeCalc(portfolio);
+  const cashDrag = d.cashDragCalc(portfolio);
+  const tlhBenefit = d.tlhCalc(portfolio);
+  const diBenefit = d.diCalc(portfolio);
+  const bonus = d.bonusCalc(portfolio);
+  const netAnnual = -(fee + cashDrag) + tlhBenefit + diBenefit;
+  const fiveYr = netAnnual * 5 + bonus;
+  return { ...d, fee, cashDrag, tlhBenefit, diBenefit, bonus, netAnnual, fiveYr };
+}
+
+function calcAllPlatforms(portfolio) {
+  return PLATFORM_IDS.map(id => {
+    const c = calcPlatform(id, portfolio);
+    return {
+      name: c.name, fee: c.fee, cashDrag: c.cashDrag,
+      tlhType: c.tlhType, tlhClass: c.tlhClass,
+      tlhBenefit: c.tlhBenefit, diBenefit: c.diBenefit,
+      bonus: c.bonus, bonusNote: c.bonus > 0 ? (c.bonusLabel || '') : '',
+    };
+  });
+}
+
+function fiveYearNet(p) {
+  return (p.fee + (p.cashDrag || 0) - p.tlhBenefit - p.diBenefit) * 5 - p.bonus;
+}
+
+// Build platform picker
+function buildPicker() {
+  const container = document.getElementById('platformPicker');
+  container.innerHTML = PLATFORM_IDS.map(id => {
+    const d = PLATFORM_DEFS[id];
+    const sel = selectedPlatforms.includes(id) ? 'selected' : '';
+    return `<button class="pick-btn ${sel}" data-id="${id}">${d.name}</button>`;
+  }).join('');
+
+  container.querySelectorAll('.pick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      if (selectedPlatforms.includes(id)) {
+        if (selectedPlatforms.length > 1) {
+          selectedPlatforms = selectedPlatforms.filter(x => x !== id);
+        }
+      } else {
+        if (selectedPlatforms.length >= 2) {
+          selectedPlatforms.shift();
+        }
+        selectedPlatforms.push(id);
+      }
+      buildPicker();
+      update();
+    });
+  });
+}
+
+function renderComparison(portfolio) {
+  if (selectedPlatforms.length < 2) return;
+  const [aId, bId] = selectedPlatforms;
+  const a = calcPlatform(aId, portfolio);
+  const b = calcPlatform(bId, portfolio);
+
+  // Side-by-side cards
+  document.getElementById('vsCards').innerHTML = [a, b].map((p, i) => `
+    <div class="vs-card" style="border-top: 3px solid ${p.color};">
+      <h3>${p.name}</h3>
+      <p class="description">${p.desc}</p>
+      <div class="stat-grid">
+        <div class="stat">
+          <span class="stat-label">Advisory Fee</span>
+          <span class="stat-value" style="color: ${p.fee <= ([a,b][1-i]).fee ? 'var(--green)' : 'var(--text)'}">${formatCurrency(p.fee + p.cashDrag)}/yr</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Effective Rate</span>
+          <span class="stat-value">${portfolio > 0 ? formatRate((p.fee + p.cashDrag) / portfolio) : '0%'}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Tax-Loss Harvesting</span>
+          <span class="stat-value ${p.tlhClass}">${p.tlhLabel}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Direct Indexing</span>
+          <span class="stat-value" style="color: ${p.diBenefit > 0 ? 'var(--green)' : 'var(--text-muted)'}">${p.diLabel}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Transfer Bonus</span>
+          <span class="stat-value" style="color: ${p.bonus > 0 ? 'var(--green)' : 'var(--text-muted)'}">${p.bonus > 0 ? formatCurrency(p.bonus) : 'None'}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  // Savings banner
+  const feeDiff = (a.fee + a.cashDrag) - (b.fee + b.cashDrag);
+  const cheaper = feeDiff > 0 ? b : a;
+  document.getElementById('savingsBanner').innerHTML = `
+    <div class="savings-banner">
+      <div class="big-number">${formatCurrency(Math.abs(feeDiff))}/yr</div>
+      <div class="savings-label">annual fee savings choosing ${cheaper.name}</div>
+      <div class="savings-label" style="margin-top: 0.5rem; font-size: 0.8rem;">See the full picture below including tax benefits.</div>
+    </div>
+  `;
+
+  // Feature comparison
+  const features = [
+    ['Portfolio', a.portfolio, b.portfolio],
+    ['Auto-rebalancing', a.rebalancing, b.rebalancing],
+    ['Tax-loss harvesting', a.tlhLabel, b.tlhLabel],
+    ['Direct indexing', a.diLabel, b.diLabel],
+    ['Advisory fee', formatCurrency(a.fee + a.cashDrag) + '/yr', formatCurrency(b.fee + b.cashDrag) + '/yr'],
+    ['Transfer bonus', a.bonus > 0 ? formatCurrency(a.bonus) : '$0', b.bonus > 0 ? formatCurrency(b.bonus) : '$0'],
+    ['HYSA rate', a.hysa, b.hysa],
+    ['Account minimum', a.minimum, b.minimum],
+  ];
+
+  document.getElementById('featureComparison').innerHTML = `
+    <div class="comparison-details" style="margin-top: 1rem;">
+      <h3>Feature-by-Feature</h3>
+      <div class="detail-row header">
+        <span>Feature</span><span>${a.name}</span><span>${b.name}</span>
+      </div>
+      ${features.map(([label, aVal, bVal]) => `
+        <div class="detail-row"><span>${label}</span><span>${aVal}</span><span>${bVal}</span></div>
+      `).join('')}
+    </div>
+  `;
+
+  // Full picture
+  document.getElementById('fullPicture').innerHTML = `
+    <div class="comparison-details" style="margin-top: 1rem;">
+      <h3>The Full Picture: Fees vs Tax Benefits</h3>
+      <div style="background: var(--bg); border-radius: 8px; padding: 1rem; margin-top: 0.5rem;">
+        <div class="detail-row header"><span>Item</span><span>${a.name}</span><span>${b.name}</span></div>
+        <div class="detail-row">
+          <span>Advisory fee</span>
+          <span style="color:var(--red)">-${formatCurrency(a.fee + a.cashDrag)}/yr</span>
+          <span style="color:var(--red)">-${formatCurrency(b.fee + b.cashDrag)}/yr</span>
+        </div>
+        <div class="detail-row">
+          <span>TLH benefit</span>
+          <span style="color:${a.tlhBenefit > 0 ? 'var(--green)' : 'var(--text-muted)'}">+${formatCurrency(a.tlhBenefit)}/yr</span>
+          <span style="color:${b.tlhBenefit > 0 ? 'var(--green)' : 'var(--text-muted)'}">+${formatCurrency(b.tlhBenefit)}/yr</span>
+        </div>
+        <div class="detail-row">
+          <span>Direct indexing</span>
+          <span style="color:${a.diBenefit > 0 ? 'var(--green)' : 'var(--text-muted)'}">${a.diBenefit > 0 ? '+' + formatCurrency(a.diBenefit) + '/yr' : 'N/A'}</span>
+          <span style="color:${b.diBenefit > 0 ? 'var(--green)' : 'var(--text-muted)'}">${b.diBenefit > 0 ? '+' + formatCurrency(b.diBenefit) + '/yr' : 'N/A'}</span>
+        </div>
+        <div class="detail-row">
+          <span>Transfer bonus</span>
+          <span style="color:${a.bonus > 0 ? 'var(--green)' : 'var(--text-muted)'}">${a.bonus > 0 ? '+' + formatCurrency(a.bonus) : '$0'}</span>
+          <span style="color:${b.bonus > 0 ? 'var(--green)' : 'var(--text-muted)'}">${b.bonus > 0 ? '+' + formatCurrency(b.bonus) : '$0'}</span>
+        </div>
+        <div class="detail-row" style="border-top: 2px solid var(--accent); font-weight: 700;">
+          <span>Net annual</span>
+          <span style="color:${a.netAnnual >= 0 ? 'var(--green)' : 'var(--red)'}">${formatCurrency(a.netAnnual)}/yr</span>
+          <span style="color:${b.netAnnual >= 0 ? 'var(--green)' : 'var(--red)'}">${formatCurrency(b.netAnnual)}/yr</span>
+        </div>
+        <div class="detail-row" style="font-weight: 700;">
+          <span>5-year total (incl. bonus)</span>
+          <span style="color:${a.fiveYr >= 0 ? 'var(--green)' : 'var(--red)'}">${formatCurrency(a.fiveYr)}</span>
+          <span style="color:${b.fiveYr >= 0 ? 'var(--green)' : 'var(--red)'}">${formatCurrency(b.fiveYr)}</span>
+        </div>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.7; margin-top: 0.75rem;">
+        TLH estimates use your selected ${Math.round(getTaxRate() * 100)}% tax rate and assume gains to offset. Benefits are front-loaded and represent tax <em>deferral</em>, not elimination.
+      </p>
+    </div>
+  `;
+}
+
+function update() {
+  const portfolio = parseCurrency(amountInput.value);
+  if (portfolio < 1000) return;
+  slider.value = Math.min(Math.max(portfolio, 10000), 5000000);
+
+  // Dynamic comparison
+  renderComparison(portfolio);
+
+  // Educational section values
+  const tlhDailyVal = portfolio * getTlhDaily();
+  const tlhAnnualVal = portfolio * getTlhAnnual();
+  document.getElementById('tlh-daily-value').textContent = formatCurrency(tlhDailyVal) + '/yr';
+  document.getElementById('tlh-annual-value').textContent = formatCurrency(tlhAnnualVal) + '/yr';
+  document.getElementById('tlh-frequency-value').textContent = formatCurrency(tlhDailyVal - tlhAnnualVal) + '/yr';
+  const diWealthfront = portfolio * getDiBenefit(US_SLEEVE_ROBO);
+  document.getElementById('direct-indexing-value').textContent = formatCurrency(diWealthfront) + '/yr';
+  document.getElementById('tlh-tax-rate').textContent = Math.round(getTaxRate() * 100) + '%';
+  const diWholePortfolio = (DI_PRETAX_ALPHA * US_SLEEVE_ROBO * getTaxRate() * 100).toFixed(2);
+  document.getElementById('di-rate-note').textContent = '0.75% \u00d7 ' + Math.round(US_SLEEVE_ROBO * 100) + '% US sleeve \u00d7 ' + Math.round(getTaxRate() * 100) + '% tax rate = ~' + diWholePortfolio + '% whole-portfolio benefit';
+
+  // All platforms table
+  const platforms = calcAllPlatforms(portfolio);
+  platforms.sort((a, b) => fiveYearNet(a) - fiveYearNet(b));
+
+  document.getElementById('comparisonTable').innerHTML = platforms.map((p, i) => {
+    const annualFee = p.fee + (p.cashDrag || 0);
+    const netFive = -fiveYearNet(p);
+    const feeDisplay = p.cashDrag
+      ? formatCurrency(annualFee) + ' <span style="color:var(--text-muted);font-size:0.75rem;">(drag)</span>'
+      : formatCurrency(annualFee);
+    const tlhDisplay = p.tlhBenefit > 0
+      ? '<span style="color:var(--green);">+' + formatCurrency(p.tlhBenefit) + '</span>'
+      : '<span style="color:var(--text-muted);">$0</span>';
+    const diDisplay = p.diBenefit > 0
+      ? '<span style="color:var(--green);">+' + formatCurrency(p.diBenefit) + '</span>'
+      : '<span style="color:var(--text-muted);">—</span>';
+    const bonusDisplay = p.bonus > 0
+      ? formatCurrency(p.bonus) + (p.bonusNote ? ' <span style="color:var(--text-muted);font-size:0.75rem;">(' + p.bonusNote + ')</span>' : '')
+      : p.bonusNote || '—';
+    return `<tr class="${i === 0 ? 'best-row' : ''}">
+      <td class="platform-name">${p.name}</td>
+      <td>${feeDisplay}</td>
+      <td class="${p.tlhClass}">${p.tlhType}</td>
+      <td>${tlhDisplay}</td>
+      <td>${diDisplay}</td>
+      <td>${bonusDisplay}</td>
+      <td class="five-year-cost" style="color: ${netFive >= 0 ? 'var(--green)' : 'var(--red)'}">${netFive > 0 ? '+' : ''}${formatCurrency(netFive)}</td>
+    </tr>`;
+  }).join('');
+
+  // Bonus table
+  const bonuses = [
+    {
+      name: 'Robinhood Gold', type: 'Robo-advisor',
+      bonus: daysLeft > 0 ? portfolio * 0.02 : 0,
+      bonusRate: daysLeft > 0 ? '2%' : '—', hold: '5 years',
+      notes: daysLeft > 0 ? 'HOOD Rewards promo (ends 3/25/2026). Requires Gold ($50/yr).' : 'Promo ended. Standard transfers have no bonus.',
+    },
+    {
+      name: 'Public.com', type: 'DI / Brokerage',
+      bonus: portfolio * 0.01, bonusRate: '1%', hold: '5 years',
+      notes: 'Also offers Direct Index product (0.19% fee). Automated TLH via individual stock ownership.',
+    },
+    {
+      name: 'E*TRADE', type: 'Brokerage',
+      bonus: portfolio >= 5000000 ? 10000 : portfolio >= 2000000 ? 6000 : portfolio >= 1500000 ? 5000 : portfolio >= 1000000 ? 3000 : portfolio >= 500000 ? 1500 : portfolio >= 200000 ? 1000 : portfolio >= 100000 ? 600 : portfolio >= 20000 ? 300 : 0,
+      bonusRate: 'Tiered', hold: '12 months',
+      notes: 'Full-service brokerage (Morgan Stanley). Code OFFER26, expires 6/30/26.',
+    },
+  ];
+  bonuses.sort((a, b) => b.bonus - a.bonus);
+  document.getElementById('bonusTable').innerHTML = bonuses.map((b, i) => `
+    <tr class="${i === 0 ? 'best-row' : ''}">
+      <td class="platform-name">${b.name}</td>
+      <td>${b.type}</td>
+      <td style="font-weight: 600; color: ${i === 0 ? 'var(--green)' : 'var(--text)'}">${formatCurrency(b.bonus)} <span style="color:var(--text-muted);font-size:0.75rem;">(${b.bonusRate})</span></td>
+      <td>${b.hold}</td>
+      <td style="white-space: normal; max-width: 250px; font-size: 0.8rem; color: var(--text-muted);">${b.notes}</td>
+    </tr>
+  `).join('');
+}
+
+slider.addEventListener('input', () => {
+  amountInput.value = parseInt(slider.value).toLocaleString();
+  update();
+});
+amountInput.addEventListener('input', () => {
+  const raw = amountInput.value.replace(/[^0-9]/g, '');
+  if (raw) amountInput.value = parseInt(raw).toLocaleString();
+  update();
+});
+amountInput.addEventListener('blur', () => {
+  if (parseCurrency(amountInput.value) < 10000) amountInput.value = '10,000';
+  update();
+});
+taxRateSelect.addEventListener('change', update);
+
+buildPicker();
+update();
+</script>
+
+</body>
+</html>

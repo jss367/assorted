@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Compare renting and buying with adjustable housing costs, mortgage payments, investment returns, and home equity.">
+<title>Rent versus Buy Calculator</title>
+<style>
+  :root { color-scheme: dark; --bg:#0f1117; --card:#1a1d27; --border:#2a2d3a; --text:#e4e4e7; --muted:#9ca3af; --accent:#818cf8; --buy:#818cf8; --rent:#34d399; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+  main { max-width:1000px; margin:auto; padding:2rem 1.5rem 3rem; }
+  h1 { font-size:1.75rem; letter-spacing:-.025em; }
+  h2 { font-size:1.15rem; margin-bottom:.4rem; }
+  h3 { font-size:1rem; margin-bottom:.7rem; }
+  p { margin-bottom:.7rem; }
+  a { color:var(--accent); }
+  .subtitle,.muted { color:var(--muted); }
+  .subtitle { font-size:.95rem; margin-bottom:1.5rem; }
+  .small { font-size:.8rem; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:1.5rem; margin-bottom:1.25rem; }
+  .toolbar { display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+  .toolbar label { font-size:.85rem; font-weight:600; }
+  .toolbar input[type=range] { flex:1; min-width:120px; }
+  .toolbar input[type=number] { width:72px; }
+  input[type=range] { accent-color:var(--accent); cursor:pointer; }
+  input[type=number] { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:7px; padding:.55rem .7rem; font:inherit; font-size:.95rem; }
+  input[aria-invalid=true] { border-color:#f87171; }
+  button { border:1px solid var(--border); border-radius:7px; padding:.55rem .8rem; background:var(--bg); color:var(--text); font:inherit; font-size:.8rem; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+  .columns { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  .columns > .card { min-width:0; }
+  .buy-border { border-top:3px solid var(--buy); }
+  .rent-border { border-top:3px solid var(--rent); }
+  .buy-text { color:var(--buy); }
+  .rent-text { color:var(--rent); }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  .field label { display:block; color:var(--muted); font-size:.8rem; margin-bottom:.3rem; }
+  .field small { display:block; color:var(--muted); font-size:.72rem; margin-top:.3rem; }
+  details { border-top:1px solid var(--border); padding-top:.8rem; margin-top:1rem; }
+  summary { cursor:pointer; font-size:.85rem; font-weight:600; }
+  details .fields { margin-top:1rem; }
+  .error { color:#fca5a5; background:#321e27; padding:.7rem 1rem; border-radius:7px; margin-bottom:1rem; }
+  [hidden] { display:none !important; }
+  .result { background:linear-gradient(120deg,rgba(99,102,241,.13),var(--card)); }
+  .eyebrow { color:var(--muted); text-transform:uppercase; letter-spacing:.07em; font-size:.7rem; font-weight:600; }
+  #verdict { font-size:1.65rem; margin:.25rem 0; letter-spacing:-.025em; }
+  .metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; padding-top:1rem; margin-top:1rem; border-top:1px solid var(--border); }
+  .metric-label { font-size:.75rem; color:var(--muted); }
+  .metric-value { font-size:1.35rem; font-weight:650; font-variant-numeric:tabular-nums; }
+  .legend { display:flex; gap:1rem; font-size:.8rem; flex-wrap:wrap; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:.35rem; background:currentColor; }
+  .chart-heading { display:flex; justify-content:space-between; gap:1rem; align-items:baseline; flex-wrap:wrap; }
+  svg { width:100%; height:auto; display:block; margin-top:.5rem; overflow:visible; }
+  .chart-readout { font-size:.85rem; min-height:1.5rem; font-variant-numeric:tabular-nums; }
+  .chart-controls { display:flex; gap:1rem; align-items:center; margin-top:.5rem; }
+  .chart-controls label { white-space:nowrap; font-size:.8rem; color:var(--muted); }
+  .chart-controls input { flex:1; min-width:0; }
+  .table-scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:.83rem; font-variant-numeric:tabular-nums; }
+  th,td { text-align:right; padding:.65rem .6rem; border-bottom:1px solid var(--border); white-space:nowrap; }
+  th { color:var(--muted); font-weight:500; }
+  th:first-child,td:first-child { text-align:left; }
+  tbody tr:last-child td { border-bottom:0; }
+  .cost-table td:first-child { white-space:normal; }
+  .total td { font-weight:650; border-top:1px solid var(--border); }
+  .sensitivity td { background:rgba(52,211,153,.07); }
+  .sensitivity td.buy-cell { background:rgba(129,140,248,.1); }
+  .sensitivity td.current { outline:1px solid var(--accent); outline-offset:-2px; }
+  .notes { font-size:.83rem; color:var(--muted); }
+  .notes ul { padding-left:1.2rem; }
+  .notes li { margin-bottom:.5rem; }
+  footer { color:var(--muted); font-size:.75rem; text-align:center; }
+  @media(max-width:640px) { main { padding:1.25rem 1rem; } .columns { grid-template-columns:1fr; gap:0; } .card { padding:1.1rem; } .metrics { grid-template-columns:1fr; gap:.7rem; } .metrics > div { display:flex; align-items:baseline; justify-content:space-between; gap:.5rem; } .metric-value { font-size:1.1rem; } #verdict { font-size:1.35rem; } .toolbar { gap:.7rem; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Rent versus Buy Calculator</h1>
+    <p class="subtitle">Compare the home you could buy with the place you could rent. See where your money ends up.</p>
+  </header>
+  <noscript><p class="error">Enable JavaScript to calculate and compare your scenarios.</p></noscript>
+  <form id="assumptions" novalidate>
+    <div class="card toolbar">
+      <label for="years">How long would you stay?</label>
+      <input id="yearsSlider" type="range" min="1" max="40" value="10" aria-label="Years in the home">
+      <input id="years" name="years" type="number" min="1" max="40" step="1" value="10" aria-describedby="yearsUnit">
+      <span id="yearsUnit" class="muted small">years</span>
+      <button type="button" id="reset">Reset assumptions</button>
+    </div>
+    <div class="columns">
+      <section class="card buy-border" aria-labelledby="buyHeading">
+        <h2 id="buyHeading" class="buy-text">If you buy</h2>
+        <p class="muted small">A fixed-rate mortgage, plus the costs of ownership.</p>
+        <div class="fields" id="buyFields"></div>
+        <details><summary>Purchase and ownership costs</summary><div class="fields" id="ownershipFields"></div></details>
+      </section>
+      <section class="card rent-border" aria-labelledby="rentHeading">
+        <h2 id="rentHeading" class="rent-text">If you rent</h2>
+        <p class="muted small">Invest your upfront savings and any monthly difference.</p>
+        <div class="fields" id="rentFields"></div>
+        <details><summary>Renting and investment assumptions</summary><div class="fields" id="investmentFields"></div></details>
+      </section>
+    </div>
+  </form>
+  <p class="muted small">Starting values are illustrative, not market forecasts. Replace them with local quotes and your own estimates. Amounts are in US dollars.</p>
+  <p id="error" class="error" role="alert" hidden></p>
+  <div id="results">
+    <section class="card result" aria-labelledby="verdict">
+      <div aria-live="polite" aria-atomic="true">
+        <p class="eyebrow">Your estimated financial outcome</p>
+        <h2 id="verdict"></h2>
+        <p id="verdictDetail" class="muted small"></p>
+      </div>
+      <div class="metrics">
+        <div><div class="metric-label">Buying · wealth after sale</div><div id="buyWealth" class="metric-value buy-text"></div></div>
+        <div><div class="metric-label">Renting · investments + deposit</div><div id="rentWealth" class="metric-value rent-text"></div></div>
+        <div><div class="metric-label">First month buying pulls ahead</div><div id="crossover" class="metric-value"></div></div>
+      </div>
+      <p class="muted small" style="margin-top:.8rem;margin-bottom:0">Both options start with the same cash and use the same monthly budget. The cheaper option invests the difference each month. A first lead can reverse later.</p>
+    </section>
+    <section class="card" aria-labelledby="chartHeading">
+      <div class="chart-heading"><h2 id="chartHeading">How your wealth changes</h2><div class="legend"><span class="buy-text"><span class="dot"></span>Buying</span><span class="rent-text"><span class="dot"></span>Renting (dashed)</span></div></div>
+      <p class="muted small">Buying includes selling costs and paying off the mortgage at each point. All figures are future dollars, without adjusting for inflation.</p>
+      <svg id="chart" viewBox="0 0 860 290" role="img" aria-labelledby="chartTitle chartDescription"></svg>
+      <div class="chart-controls"><label for="inspectYear">Inspect year</label><input type="range" id="inspectYear" min="0" max="10" step="1" value="10"></div>
+      <p id="chartReadout" class="chart-readout" aria-live="polite"></p>
+    </section>
+    <section class="card" aria-labelledby="costHeading">
+      <h2 id="costHeading">What goes into the comparison</h2>
+      <p class="muted small">Monthly amounts below are for the first month. Principal payments build equity but still count toward your cash budget.</p>
+      <div class="table-scroll"><table class="cost-table"><thead><tr><th scope="col">Cash needed</th><th scope="col" class="buy-text">Buying</th><th scope="col" class="rent-text">Renting</th></tr></thead><tbody id="costTable"></tbody></table></div>
+      <details><summary>Year-by-year breakdown</summary><div class="table-scroll"><table><thead><tr><th scope="col">Year</th><th scope="col">Home value</th><th scope="col">Mortgage left</th><th scope="col">Buyer investments</th><th scope="col">Buying wealth</th><th scope="col">Renting wealth</th><th scope="col">Buying advantage</th></tr></thead><tbody id="yearTable"></tbody></table></div><button type="button" id="download" style="margin-top:1rem">Download annual results (CSV)</button></details>
+    </section>
+    <section class="card" aria-labelledby="sensitivityHeading">
+      <h2 id="sensitivityHeading">How much do the assumptions matter?</h2>
+      <p class="muted small" id="sensitivityDescription"></p>
+      <div class="table-scroll"><table class="sensitivity" aria-describedby="sensitivityDescription"><thead id="sensitivityHead"></thead><tbody id="sensitivityBody"></tbody></table></div>
+      <p class="muted small" style="margin-top:.7rem;margin-bottom:0">Each cell shows which option ends ahead, and by how much. The outlined cell uses your current assumptions.</p>
+    </section>
+    <section class="card notes" aria-labelledby="notesHeading">
+      <h2 id="notesHeading">Assumptions behind the numbers</h2>
+      <ul>
+        <li><strong>Equal starting cash:</strong> the larger of the buyer’s down payment plus purchase costs, or the renter’s deposit. Each option invests whatever is left. The deposit earns no interest and is fully returned at the end.</li>
+        <li><strong>Equal monthly budgets:</strong> each month’s budget is the larger of the two housing bills. Both investment accounts earn your assumed return; the cheaper option adds that month’s savings at the end of the month. The model assumes you can afford either option and consistently invest the savings.</li>
+        <li><strong>Mortgage:</strong> monthly interest uses the annual loan rate divided by 12. Payments stop when the loan is repaid. Mortgage insurance, if entered, is a fixed monthly amount until the scheduled balance reaches 78% of the original price; actual loan terms can differ.</li>
+        <li><strong>Growth:</strong> home values and investments compound monthly at the equivalent annual rate. Rent increases once per year. Property tax starts as a percentage of the purchase price; tax, insurance, and homeowners association fees increase annually at the expense growth rate. Maintenance is a percentage of the home’s value at the start of each year.</li>
+        <li><strong>Taxes:</strong> use an investment return after fees and taxes. Optional owner tax savings are your own fixed annual estimate, applied monthly. No deductions, tax brackets, or home-sale capital gains taxes are calculated automatically.</li>
+        <li><strong>Costs and scope:</strong> purchase costs are paid upfront, and sale costs are a percentage of the future home value. Avoid counting escrow prepayments again in purchase costs. Shared utilities and moving costs are omitted, as are renovations, refinancing, rent concessions, and unexpected major repairs.</li>
+        <li><strong>Beyond the spreadsheet:</strong> flexibility, stability, maintenance work, and the home itself matter too. These are hypothetical financial scenarios, not a prediction or an affordability assessment.</li>
+      </ul>
+      <p style="margin-top:1rem;margin-bottom:0">Background from the Consumer Financial Protection Bureau: <a href="https://www.consumerfinance.gov/ask-cfpb/how-does-paying-down-a-mortgage-work-en-1943/">mortgage amortization</a> and <a href="https://www.consumerfinance.gov/owning-a-home/prepare/figure-out-how-much-you-want-to-spend/">budgeting for ownership costs</a>.</p>
+    </section>
+  </div>
+  <footer>Calculated in your browser. Your inputs stay on this page. <a href="../investments/index.html">Investment comparison calculator</a></footer>
+</main>
+<script>
+'use strict';
+// This model is DOM-independent so the exact calculations used by the page can be tested with Node.
+const FIELD_GROUPS = {
+  buyFields: [
+    ['price', 'Home price ($)', 600000, 1, 100000000, 1000],
+    ['down', 'Down payment (%)', 20, 0, 100, 1],
+    ['mortgageRate', 'Mortgage interest (%)', 6.5, 0, 25, 0.1],
+    ['term', 'Mortgage term (years)', 30, 1, 40, 1],
+    ['appreciation', 'Annual home value growth (%)', 3, -20, 20, 0.1],
+    ['propertyTax', 'Annual property tax (%)', 1.1, 0, 10, 0.1]
+  ],
+  ownershipFields: [
+    ['buyCosts', 'Purchase costs (%)', 3, 0, 20, 0.1, 'Percent of price, excluding down payment.'],
+    ['sellCosts', 'Sale costs (%)', 6, 0, 20, 0.1, 'Percent of the future sale price.'],
+    ['maintenance', 'Annual maintenance (%)', 1, 0, 10, 0.1, 'Percent of home value each year.'],
+    ['homeInsurance', 'Home insurance ($/year)', 1800, 0, 100000, 100],
+    ['hoa', 'Homeowners association ($/month)', 0, 0, 10000, 25],
+    ['mortgageInsurance', 'Mortgage insurance ($/month)', 0, 0, 10000, 25, 'Enter your quote if your loan requires it.'],
+    ['expenseGrowth', 'Annual expense growth (%)', 3, -10, 20, 0.1, 'Applies to tax, insurance, and association fees.'],
+    ['taxSavings', 'Owner tax savings ($/year)', 0, 0, 100000, 100, 'Only incremental savings versus renting.']
+  ],
+  rentFields: [
+    ['rent', 'Monthly rent ($)', 2800, 0, 100000, 100],
+    ['rentGrowth', 'Annual rent growth (%)', 3, -10, 20, 0.1],
+    ['investmentReturn', 'Annual investment return (%)', 6, -20, 25, 0.1, 'After fees and taxes; used for both options.'],
+    ['rentInsurance', 'Renters insurance ($/month)', 20, 0, 10000, 5]
+  ],
+  investmentFields: [
+    ['depositMonths', 'Refundable deposit (months)', 1, 0, 12, 0.5, 'Tied up while renting, returned when you leave.']
+  ]
+};
+const FIELDS = Object.values(FIELD_GROUPS).flat();
+const DEFAULTS = Object.fromEntries([...FIELDS.map(([id, , value]) => [id, value]), ['years', 10]]);
+function validate(p) {
+  for (const [id, label, , min, max] of [...FIELDS, ['years', 'Years in the home', 10, 1, 40]]) {
+    if (typeof p[id] !== 'number' || !Number.isFinite(p[id]) || p[id] < min || p[id] > max || (['term', 'years'].includes(id) && !Number.isInteger(p[id]))) {
+      return { id, message: `${label}: enter ${['term', 'years'].includes(id) ? 'a whole number' : 'a number'} from ${min.toLocaleString('en-US')} to ${max.toLocaleString('en-US')}.` };
+    }
+  }
+  return null;
+}
+function mortgagePayment(principal, annualRate, years) {
+  if (principal === 0) return 0;
+  const rate = annualRate / 100 / 12;
+  return rate === 0 ? principal / (years * 12) : principal * rate / -Math.expm1(-years * 12 * Math.log1p(rate));
+}
+function calculate(p) {
+  const error = validate(p);
+  if (error) throw new RangeError(error.message);
+  const downPayment = p.price * p.down / 100;
+  const purchaseCosts = p.price * p.buyCosts / 100;
+  const buyerUpfront = downPayment + purchaseCosts;
+  const deposit = p.rent * p.depositMonths;
+  const startingCash = Math.max(buyerUpfront, deposit);
+  const loan = p.price - downPayment;
+  const payment = mortgagePayment(loan, p.mortgageRate, p.term);
+  const investmentGrowth = (1 + p.investmentReturn / 100) ** (1 / 12);
+  const homeGrowth = (1 + p.appreciation / 100) ** (1 / 12);
+  let balance = loan, home = p.price;
+  let buyerInvestments = startingCash - buyerUpfront, renterInvestments = startingCash - deposit;
+  let buyerPaid = buyerUpfront, renterPaid = deposit;
+  let firstMonth;
+  const rows = [];
+  function snapshot(month) {
+    const saleCosts = home * p.sellCosts / 100;
+    const buyWealth = home - saleCosts - balance + buyerInvestments;
+    const rentWealth = renterInvestments + deposit;
+    return { month, year: month / 12, home, balance, buyerInvestments, renterInvestments, saleCosts, buyWealth, rentWealth, difference: buyWealth - rentWealth, buyerPaid, renterPaid };
+  }
+  rows.push(snapshot(0));
+  let firstBuyingLead = rows[0].difference > 0.005 ? 0 : null;
+  for (let month = 1; month <= p.years * 12; month++) {
+    const year = Math.floor((month - 1) / 12);
+    const expenses = (1 + p.expenseGrowth / 100) ** year;
+    const yearHome = p.price * (1 + p.appreciation / 100) ** year;
+    const interest = balance * p.mortgageRate / 100 / 12;
+    const mortgage = month <= p.term * 12 ? Math.min(payment, balance + interest) : 0;
+    const principal = Math.max(0, mortgage - interest);
+    const insurance = balance > p.price * .78 + .005 ? p.mortgageInsurance : 0;
+    const propertyTax = p.price * p.propertyTax / 100 / 12 * expenses;
+    const maintenance = yearHome * p.maintenance / 100 / 12;
+    const homeInsurance = p.homeInsurance / 12 * expenses;
+    const hoa = p.hoa * expenses;
+    const taxSavings = p.taxSavings / 12;
+    const rent = p.rent * (1 + p.rentGrowth / 100) ** year;
+    const rentInsurance = p.rentInsurance * expenses;
+    const buyCost = mortgage + insurance + propertyTax + maintenance + homeInsurance + hoa - taxSavings;
+    const rentCost = rent + rentInsurance;
+    // Save the difference on either side, using the same total cash budget each month.
+    buyerInvestments = buyerInvestments * investmentGrowth + Math.max(0, rentCost - buyCost);
+    renterInvestments = renterInvestments * investmentGrowth + Math.max(0, buyCost - rentCost);
+    buyerPaid += buyCost;
+    renterPaid += rentCost;
+    balance = month >= p.term * 12 ? 0 : Math.max(0, balance - principal);
+    home *= homeGrowth;
+    if (month === 1) firstMonth = { mortgage, principal, interest, insurance, propertyTax, maintenance, homeInsurance, hoa, taxSavings, rent, rentInsurance, buyCost, rentCost };
+    const row = snapshot(month);
+    rows.push(row);
+    if (firstBuyingLead === null && row.difference > .005) firstBuyingLead = month;
+  }
+  return { rows, annual: rows.filter(row => row.month % 12 === 0), final: rows.at(-1), firstBuyingLead, firstMonth, payment, loan, buyerUpfront, purchaseCosts, downPayment, deposit, startingCash };
+}
+globalThis.RentBuy = { DEFAULTS, validate, mortgagePayment, calculate };
+
+if (typeof document !== 'undefined') {
+  const $ = id => document.getElementById(id);
+  const money = value => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', maximumFractionDigits:0 }).format(Math.abs(value) < .5 ? 0 : value);
+  const compact = value => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', notation:'compact', maximumFractionDigits:1 }).format(value);
+  let current, params;
+  for (const [group, fields] of Object.entries(FIELD_GROUPS)) {
+    $(group).innerHTML = fields.map(([id, label, value, min, max, step, help]) => `<div class="field"><label for="${id}">${label}</label><input type="number" id="${id}" name="${id}" value="${value}" min="${min}" max="${max}" step="${step}"${help ? ` aria-describedby="${id}Help"` : ''}>${help ? `<small id="${id}Help">${help}</small>` : ''}</div>`).join('');
+  }
+  function readInputs() {
+    return Object.fromEntries(Object.keys(DEFAULTS).map(id => [id, $(id).value === '' ? NaN : Number($(id).value)]));
+  }
+  function cellRow(label, buy, rent, total = false) {
+    return `<tr${total ? ' class="total"' : ''}><td>${label}</td><td>${typeof buy === 'number' ? money(buy) : buy}</td><td>${typeof rent === 'number' ? money(rent) : rent}</td></tr>`;
+  }
+  function drawChart() {
+    const rows = current.annual;
+    const values = rows.flatMap(row => [row.buyWealth, row.rentWealth]);
+    const low = Math.min(0, ...values), high = Math.max(1, ...values);
+    const padding = (high - low) * .08;
+    const min = low - padding, max = high + padding;
+    const width = Math.max(280, $('chart').clientWidth);
+    const left = 72, right = width - 20;
+    $('chart').setAttribute('viewBox', `0 0 ${width} 290`);
+    const x = year => left + year / params.years * (right - left);
+    const y = value => 245 - (value - min) / (max - min) * 225;
+    const year = Number($('inspectYear').value);
+    const selected = rows[year];
+    const path = key => rows.map((row, index) => `${index ? 'L' : 'M'}${x(row.year).toFixed(2)},${y(row[key]).toFixed(2)}`).join(' ');
+    let markup = '<title id="chartTitle">Renting and buying wealth over time</title><desc id="chartDescription">Solid purple is buying after selling the home; dashed green is renting. Use the year slider for exact figures, or the year-by-year table below.</desc>';
+    for (let tick = 0; tick <= 4; tick++) {
+      const value = min + (max - min) * tick / 4;
+      markup += `<line x1="${left}" x2="${right}" y1="${y(value)}" y2="${y(value)}" stroke="#2a2d3a"/><text x="${left - 10}" y="${y(value) + 4}" text-anchor="end" fill="#9ca3af" font-size="12">${compact(value)}</text>`;
+    }
+    const tickCount = width < 450 ? 2 : 4;
+    const tickYears = [...new Set([0, ...Array.from({length:tickCount}, (_, i) => Math.round(params.years * (i + 1) / tickCount))])];
+    for (const tick of tickYears) markup += `<text x="${x(tick)}" y="274" text-anchor="middle" fill="#9ca3af" font-size="12">${tick === 0 ? 'Start' : `Year ${tick}`}</text>`;
+    markup += `<path d="${path('buyWealth')}" stroke="#818cf8" fill="none" stroke-width="3"/><path d="${path('rentWealth')}" stroke="#34d399" fill="none" stroke-width="3" stroke-dasharray="7 5"/>`;
+    markup += `<line x1="${x(year)}" x2="${x(year)}" y1="20" y2="245" stroke="#9ca3af" stroke-dasharray="3 5"/>`;
+    for (const [key, color] of [['buyWealth', '#818cf8'], ['rentWealth', '#34d399']]) markup += `<circle cx="${x(year)}" cy="${y(selected[key])}" r="5" fill="${color}" stroke="#1a1d27" stroke-width="2"/>`;
+    $('chart').innerHTML = markup;
+    $('chartReadout').textContent = `${year === 0 ? 'At the start' : `Year ${year}`}: buying ${money(selected.buyWealth)} · renting ${money(selected.rentWealth)}`;
+    $('inspectYear').setAttribute('aria-valuetext', $('chartReadout').textContent);
+  }
+  function render() {
+    params = readInputs();
+    const error = validate(params);
+    for (const id of Object.keys(DEFAULTS)) $(id).removeAttribute('aria-invalid');
+    $('error').hidden = !error;
+    $('results').hidden = !!error;
+    if (error) {
+      $(error.id).setAttribute('aria-invalid', 'true');
+      $('error').textContent = error.message;
+      return;
+    }
+    $('yearsSlider').value = params.years;
+    current = calculate(params);
+    const end = current.final, first = current.firstMonth;
+    const tied = Math.abs(end.difference) < .5;
+    $('verdict').textContent = tied ? `Renting and buying are even after ${params.years} years` : `${end.difference > 0 ? 'Buying' : 'Renting'} leaves you ${money(Math.abs(end.difference))} ahead`;
+    $('verdictDetail').textContent = `After ${params.years} ${params.years === 1 ? 'year' : 'years'}, with ${money(current.startingCash)} in starting cash and the assumptions above.`;
+    $('buyWealth').textContent = money(end.buyWealth);
+    $('rentWealth').textContent = money(end.rentWealth);
+    const lead = current.firstBuyingLead;
+    $('crossover').textContent = lead === null ? `Not within ${params.years} ${params.years === 1 ? 'year' : 'years'}` : lead === 0 ? 'From the start' : `${Math.floor(lead / 12)} yr ${lead % 12} mo`;
+    const wasAtEnd = Number($('inspectYear').value) === Number($('inspectYear').max);
+    $('inspectYear').max = params.years;
+    if (wasAtEnd || Number($('inspectYear').value) > params.years) $('inspectYear').value = params.years;
+    drawChart();
+    $('costTable').innerHTML = [
+      cellRow('Down payment / refundable deposit', current.downPayment, current.deposit),
+      cellRow('Purchase closing costs', current.purchaseCosts, 0),
+      cellRow('Total upfront housing cash', current.buyerUpfront, current.deposit, true),
+      cellRow('Starting investments', current.startingCash - current.buyerUpfront, current.startingCash - current.deposit),
+      cellRow('Mortgage principal + interest / rent', first.mortgage, first.rent),
+      cellRow('Property tax', first.propertyTax, 0),
+      cellRow('Home / renters insurance', first.homeInsurance, first.rentInsurance),
+      cellRow('Maintenance allowance', first.maintenance, 0),
+      cellRow('Homeowners association', first.hoa, 0),
+      cellRow('Mortgage insurance', first.insurance, 0),
+      cellRow('Estimated tax savings', -first.taxSavings, 0),
+      cellRow('First-month housing cost', first.buyCost, first.rentCost, true),
+      cellRow('First-month amount invested', Math.max(0, first.rentCost - first.buyCost), Math.max(0, first.buyCost - first.rentCost)),
+      cellRow('Sale costs at end of stay', end.saleCosts, 0)
+    ].join('');
+    $('yearTable').innerHTML = current.annual.map(row => `<tr><td>${row.year}</td>${['home','balance','buyerInvestments','buyWealth','rentWealth','difference'].map(key => `<td>${money(row[key])}</td>`).join('')}</tr>`).join('');
+    const returns = [-2, 0, 2].map(delta => Math.max(-20, Math.min(25, params.investmentReturn + delta)));
+    const growths = [-2, 0, 2].map(delta => Math.max(-20, Math.min(20, params.appreciation + delta)));
+    $('sensitivityDescription').textContent = `Your ${params.years}-year outcome with annual home growth and investment returns up to 2 percentage points lower or higher. All other inputs stay the same.`;
+    $('sensitivityHead').innerHTML = `<tr><th scope="col">Home growth ↓ / Return →</th>${returns.map(value => `<th scope="col">${+value.toFixed(2)}%</th>`).join('')}</tr>`;
+    $('sensitivityBody').innerHTML = growths.map((growth, i) => `<tr><th scope="row">${+growth.toFixed(2)}%</th>${returns.map((investmentReturn, j) => {
+      const difference = calculate({...params, appreciation:growth, investmentReturn}).final.difference;
+      return `<td class="${difference > 0 ? 'buy-cell' : ''} ${i === 1 && j === 1 ? 'current' : ''}">${Math.abs(difference) < .5 ? 'Even' : `${difference > 0 ? 'Buy' : 'Rent'} +${compact(Math.abs(difference))}`}</td>`;
+    }).join('')}</tr>`).join('');
+  }
+  $('assumptions').addEventListener('submit', event => event.preventDefault());
+  $('assumptions').addEventListener('input', event => {
+    if (event.target.id === 'yearsSlider') $('years').value = event.target.value;
+    render();
+  });
+  $('reset').addEventListener('click', () => {
+    for (const [id, value] of Object.entries(DEFAULTS)) $(id).value = value;
+    $('inspectYear').max = DEFAULTS.years;
+    $('inspectYear').value = DEFAULTS.years;
+    render();
+  });
+  $('inspectYear').addEventListener('input', drawChart);
+  window.addEventListener('resize', () => {
+    if (!$('results').hidden) drawChart();
+  });
+  $('download').addEventListener('click', () => {
+    const lines = [['Rent versus buy assumptions'], ['Assumption','Value'], ...Object.entries(params).map(([id, value]) => [id === 'years' ? 'Years in the home' : FIELDS.find(field => field[0] === id)[1], value]), [], ['Year','Home value','Mortgage remaining','Buyer investments','Renter investments','Sale costs','Buying wealth after sale','Renting wealth with deposit','Buying advantage']];
+    lines.push(...current.annual.map(row => [row.year, ...['home','balance','buyerInvestments','renterInvestments','saleCosts','buyWealth','rentWealth','difference'].map(key => row[key].toFixed(2))]));
+    const csv = lines.map(row => row.map(cell => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+    const link = document.createElement('a');
+    link.href = url; link.download = 'rent-versus-buy-comparison.csv';
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  render();
+}
+</script>
+</body>
+</html>

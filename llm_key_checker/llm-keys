@@ -1,0 +1,962 @@
+#!/usr/bin/env python3
+"""llm-keys — scan this machine for LLM provider API keys and report what's here.
+
+Looks for keys in env vars, shell rc files, .env/.envrc files, provider config
+files, and (on macOS) the Keychain. For each key it finds, optionally probes a
+free metadata endpoint to confirm the key works and learn about the account
+behind it.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Callable, Iterable
+
+HTTP_TIMEOUT = 6.0
+HOME = Path.home()
+
+# ---------------------------------------------------------------------------
+# Provider definitions
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Provider:
+    name: str
+    env_vars: tuple[str, ...]
+    # Patterns are tried in order; first match wins. Used to classify a bare
+    # value (no env-var context).
+    value_patterns: tuple[re.Pattern, ...]
+    probe: Callable[[str], dict] | None = None
+    # Keychain service names worth querying on macOS.
+    keychain_services: tuple[str, ...] = ()
+    # Per-provider config files to scan if present.
+    config_paths: tuple[Path, ...] = ()
+
+
+# ---------------------------------------------------------------------------
+# Probes — each returns a small dict of facts about the key, or raises.
+# Network errors / non-2xx are caught upstream and reported as "probe failed".
+# ---------------------------------------------------------------------------
+
+
+def _http_get(url: str, headers: dict[str, str]) -> tuple[int, bytes]:
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read() if e.fp else b""
+
+
+def _http_json(url: str, headers: dict[str, str]) -> tuple[int, dict | list | None]:
+    status, body = _http_get(url, headers)
+    if not body:
+        return status, None
+    try:
+        return status, json.loads(body.decode("utf-8", errors="replace"))
+    except (ValueError, UnicodeDecodeError):
+        return status, None
+
+
+def probe_anthropic(key: str) -> dict:
+    status, data = _http_json(
+        "https://api.anthropic.com/v1/models",
+        {"x-api-key": key, "anthropic-version": "2023-06-01"},
+    )
+    if status == 200 and isinstance(data, dict):
+        models = data.get("data", [])
+        return {"ok": True, "models": len(models)}
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+def probe_openai(key: str) -> dict:
+    status, data = _http_json(
+        "https://api.openai.com/v1/models",
+        {"Authorization": f"Bearer {key}"},
+    )
+    if status == 200 and isinstance(data, dict):
+        return {"ok": True, "models": len(data.get("data", []))}
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+def probe_xai(key: str) -> dict:
+    status, data = _http_json(
+        "https://api.x.ai/v1/models",
+        {"Authorization": f"Bearer {key}"},
+    )
+    if status == 200 and isinstance(data, dict):
+        return {"ok": True, "models": len(data.get("data", []))}
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+def probe_gemini(key: str) -> dict:
+    url = "https://generativelanguage.googleapis.com/v1beta/models?" + urllib.parse.urlencode(
+        {"key": key}
+    )
+    status, data = _http_json(url, {})
+    if status == 200 and isinstance(data, dict):
+        return {"ok": True, "models": len(data.get("models", []))}
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+def probe_groq(key: str) -> dict:
+    status, data = _http_json(
+        "https://api.groq.com/openai/v1/models",
+        {"Authorization": f"Bearer {key}"},
+    )
+    if status == 200 and isinstance(data, dict):
+        return {"ok": True, "models": len(data.get("data", []))}
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+def probe_mistral(key: str) -> dict:
+    status, data = _http_json(
+        "https://api.mistral.ai/v1/models",
+        {"Authorization": f"Bearer {key}"},
+    )
+    if status == 200 and isinstance(data, dict):
+        return {"ok": True, "models": len(data.get("data", []))}
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+def probe_deepseek(key: str) -> dict:
+    status, data = _http_json(
+        "https://api.deepseek.com/models",
+        {"Authorization": f"Bearer {key}"},
+    )
+    if status == 200 and isinstance(data, dict):
+        return {"ok": True, "models": len(data.get("data", []))}
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+def probe_together(key: str) -> dict:
+    status, data = _http_json(
+        "https://api.together.xyz/v1/models",
+        {"Authorization": f"Bearer {key}"},
+    )
+    if status == 200:
+        n = len(data) if isinstance(data, list) else len(data.get("data", [])) if isinstance(data, dict) else 0
+        return {"ok": True, "models": n}
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+def probe_huggingface(key: str) -> dict:
+    status, data = _http_json(
+        "https://huggingface.co/api/whoami-v2",
+        {"Authorization": f"Bearer {key}"},
+    )
+    if status == 200 and isinstance(data, dict):
+        out = {"ok": True, "user": data.get("name") or data.get("fullname")}
+        orgs = [o.get("name") for o in (data.get("orgs") or []) if isinstance(o, dict)]
+        if orgs:
+            out["orgs"] = orgs
+        token_type = (data.get("auth") or {}).get("accessToken", {}).get("role")
+        if token_type:
+            out["role"] = token_type
+        return out
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+def probe_openrouter(key: str) -> dict:
+    status, data = _http_json(
+        "https://openrouter.ai/api/v1/auth/key",
+        {"Authorization": f"Bearer {key}"},
+    )
+    if status == 200 and isinstance(data, dict):
+        d = data.get("data", data)
+        out = {"ok": True}
+        if d.get("label"):
+            out["label"] = d["label"]
+        if d.get("usage") is not None:
+            out["usage_usd"] = d["usage"]
+        if d.get("limit") is not None:
+            out["limit_usd"] = d["limit"]
+        if d.get("is_free_tier") is not None:
+            out["free_tier"] = d["is_free_tier"]
+        return out
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+def probe_replicate(key: str) -> dict:
+    status, data = _http_json(
+        "https://api.replicate.com/v1/account",
+        {"Authorization": f"Bearer {key}"},
+    )
+    if status == 200 and isinstance(data, dict):
+        return {
+            "ok": True,
+            "user": data.get("username") or data.get("name"),
+            "type": data.get("type"),
+        }
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+def probe_cohere(key: str) -> dict:
+    status, data = _http_json(
+        "https://api.cohere.com/v1/models",
+        {"Authorization": f"Bearer {key}"},
+    )
+    if status == 200 and isinstance(data, dict):
+        return {"ok": True, "models": len(data.get("models", []))}
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+# Perplexity has no free metadata endpoint — every authenticated request is
+# a billable chat completion. We deliberately don't probe Perplexity keys;
+# discovery and reporting still work, the probe slot just stays empty.
+
+
+def probe_fireworks(key: str) -> dict:
+    status, data = _http_json(
+        "https://api.fireworks.ai/inference/v1/models",
+        {"Authorization": f"Bearer {key}"},
+    )
+    if status == 200 and isinstance(data, dict):
+        return {"ok": True, "models": len(data.get("data", []))}
+    return {"ok": False, "status": status, "detail": _err(data)}
+
+
+def _err(data) -> str:
+    if isinstance(data, dict):
+        # Try a few common error-message shapes.
+        for k in ("error", "message", "detail"):
+            v = data.get(k)
+            if isinstance(v, str):
+                return v[:200]
+            if isinstance(v, dict) and isinstance(v.get("message"), str):
+                return v["message"][:200]
+    return ""
+
+
+def _err_bytes(b: bytes) -> str:
+    try:
+        return _err(json.loads(b.decode("utf-8", errors="replace")))
+    except ValueError:
+        return b[:200].decode("utf-8", errors="replace")
+
+
+# ---------------------------------------------------------------------------
+# Provider table
+# ---------------------------------------------------------------------------
+
+PROVIDERS: list[Provider] = [
+    Provider(
+        "Anthropic",
+        env_vars=("ANTHROPIC_API_KEY", "CLAUDE_API_KEY", "ANTHROPIC_AUTH_TOKEN"),
+        value_patterns=(re.compile(r"sk-ant-[A-Za-z0-9_\-]{40,}"),),
+        probe=probe_anthropic,
+        keychain_services=("anthropic", "ANTHROPIC_API_KEY"),
+        config_paths=(HOME / ".anthropic", HOME / ".config" / "anthropic"),
+    ),
+    Provider(
+        "OpenRouter",
+        env_vars=("OPENROUTER_API_KEY",),
+        value_patterns=(re.compile(r"sk-or-v1-[A-Za-z0-9]{40,}"),),
+        probe=probe_openrouter,
+        keychain_services=("openrouter", "OPENROUTER_API_KEY"),
+        config_paths=(HOME / ".config" / "openrouter",),
+    ),
+    Provider(
+        "OpenAI",
+        env_vars=("OPENAI_API_KEY", "OPENAI_KEY"),
+        # Match sk-, sk-proj-, sk-svcacct-, sk-admin-. Excludes sk-ant- / sk-or-
+        # because those are matched by earlier providers in this list.
+        value_patterns=(re.compile(r"sk-(?:proj|svcacct|admin)?-?[A-Za-z0-9_\-]{20,}"),),
+        probe=probe_openai,
+        keychain_services=("openai", "OPENAI_API_KEY"),
+        config_paths=(HOME / ".openai", HOME / ".config" / "openai"),
+    ),
+    Provider(
+        "xAI (Grok)",
+        env_vars=("XAI_API_KEY", "GROK_API_KEY"),
+        value_patterns=(re.compile(r"xai-[A-Za-z0-9]{60,}"),),
+        probe=probe_xai,
+        keychain_services=("xai", "grok", "XAI_API_KEY"),
+    ),
+    Provider(
+        "Google Gemini",
+        env_vars=("GOOGLE_API_KEY", "GEMINI_API_KEY", "GOOGLE_GENAI_API_KEY"),
+        value_patterns=(re.compile(r"AIza[A-Za-z0-9_\-]{35}"),),
+        probe=probe_gemini,
+        keychain_services=("gemini", "google_genai", "GEMINI_API_KEY"),
+    ),
+    Provider(
+        "Groq",
+        env_vars=("GROQ_API_KEY",),
+        value_patterns=(re.compile(r"gsk_[A-Za-z0-9]{40,}"),),
+        probe=probe_groq,
+        keychain_services=("groq", "GROQ_API_KEY"),
+    ),
+    Provider(
+        "Mistral",
+        env_vars=("MISTRAL_API_KEY",),
+        value_patterns=(),  # 32-char alphanum is too generic; rely on env var name
+        probe=probe_mistral,
+        keychain_services=("mistral", "MISTRAL_API_KEY"),
+    ),
+    Provider(
+        "DeepSeek",
+        env_vars=("DEEPSEEK_API_KEY",),
+        value_patterns=(),  # also sk-... shape; rely on env var name
+        probe=probe_deepseek,
+        keychain_services=("deepseek", "DEEPSEEK_API_KEY"),
+    ),
+    Provider(
+        "Together",
+        env_vars=("TOGETHER_API_KEY", "TOGETHERAI_API_KEY"),
+        value_patterns=(re.compile(r"\btogether_[A-Za-z0-9]{40,}\b"),),
+        probe=probe_together,
+        keychain_services=("together", "TOGETHER_API_KEY"),
+    ),
+    Provider(
+        "Hugging Face",
+        env_vars=("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN", "HF_API_TOKEN"),
+        value_patterns=(re.compile(r"hf_[A-Za-z0-9]{30,}"),),
+        probe=probe_huggingface,
+        keychain_services=("huggingface", "HF_TOKEN"),
+        config_paths=(HOME / ".cache" / "huggingface" / "token", HOME / ".huggingface" / "token"),
+    ),
+    Provider(
+        "Replicate",
+        env_vars=("REPLICATE_API_TOKEN", "REPLICATE_API_KEY"),
+        value_patterns=(re.compile(r"r8_[A-Za-z0-9]{30,}"),),
+        probe=probe_replicate,
+        keychain_services=("replicate", "REPLICATE_API_TOKEN"),
+    ),
+    Provider(
+        "Cohere",
+        env_vars=("COHERE_API_KEY", "CO_API_KEY"),
+        value_patterns=(),  # 40-char alphanum, too generic
+        probe=probe_cohere,
+        keychain_services=("cohere", "COHERE_API_KEY"),
+    ),
+    Provider(
+        "Perplexity",
+        env_vars=("PERPLEXITY_API_KEY", "PPLX_API_KEY"),
+        value_patterns=(re.compile(r"pplx-[A-Za-z0-9]{40,}"),),
+        probe=None,  # no free metadata endpoint; would burn user credit
+        keychain_services=("perplexity", "PERPLEXITY_API_KEY"),
+    ),
+    Provider(
+        "Fireworks",
+        env_vars=("FIREWORKS_API_KEY",),
+        value_patterns=(re.compile(r"fw_[A-Za-z0-9]{20,}"),),
+        probe=probe_fireworks,
+        keychain_services=("fireworks", "FIREWORKS_API_KEY"),
+    ),
+]
+
+PROVIDER_BY_NAME = {p.name: p for p in PROVIDERS}
+PROVIDER_BY_ENV_VAR = {v: p for p in PROVIDERS for v in p.env_vars}
+
+# Env-var names that look generic but often hold provider keys. Used as a hint
+# when a value's prefix doesn't match any pattern.
+SUSPICIOUS_VAR_SUFFIXES = ("_API_KEY", "_API_TOKEN", "_TOKEN", "_KEY")
+
+# ---------------------------------------------------------------------------
+# Findings
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Finding:
+    provider: str          # Provider.name or "Unknown"
+    var_name: str | None   # env-var name where this was found (if any)
+    value: str
+    source: str            # human-readable origin: "env", "~/.zshrc", etc.
+    note: str | None = None  # any comment text the user wrote next to the key
+
+
+# Google's AIza key format is shared across every Google API (Maps, Translate,
+# YouTube, Sheets, ...). When we match it by pattern but the env-var name
+# clearly points to a non-Gemini Google product, don't claim it's a Gemini key.
+_GOOGLE_NON_GEMINI = (
+    "MAPS", "PLACES", "ROUTES", "DIRECTIONS", "GEOCODING",
+    "TRANSLATE", "YOUTUBE", "DRIVE", "SHEETS", "DOCS", "CALENDAR",
+    "GMAIL", "ANALYTICS", "TAG_MANAGER", "RECAPTCHA", "OAUTH",
+    "CLOUD_VISION", "SPEECH", "STORAGE", "FIRESTORE", "PUBSUB",
+)
+
+
+def classify(value: str, var_name: str | None) -> str:
+    """Return a Provider.name or 'Unknown'."""
+    # Strongest signal: env-var name matches a known provider var exactly.
+    if var_name and var_name in PROVIDER_BY_ENV_VAR:
+        return PROVIDER_BY_ENV_VAR[var_name].name
+    # Value-pattern match (PROVIDERS order: specific prefixes first).
+    for p in PROVIDERS:
+        for pat in p.value_patterns:
+            if pat.fullmatch(value):
+                if p.name == "Google Gemini" and var_name:
+                    if any(d in var_name.upper() for d in _GOOGLE_NON_GEMINI):
+                        return "Unknown"
+                return p.name
+    # Note: no fuzzy substring fallback on var name. It was too loose
+    # (GOOGLE_MAPS_API_KEY → Gemini, etc.). Anything not classified above is
+    # still reported under "Unclassified" with its var name visible.
+    return "Unknown"
+
+
+# ---------------------------------------------------------------------------
+# Discovery sources
+# ---------------------------------------------------------------------------
+
+
+def _looks_like_key(name: str, value: str) -> bool:
+    """Quick filter: does this var/value pair plausibly hold an API key?"""
+    if not value or len(value) < 16 or len(value) > 400:
+        return False
+    if any(c in value for c in " \t\n"):
+        return False
+    # Shell indirections and command substitutions ($VAR, ${VAR}, $(cmd),
+    # `cmd`) aren't real key material — rejecting them prevents misleading
+    # "probe rejected" output on .env files that forward via expansion.
+    if "$" in value or "`" in value:
+        return False
+    name_u = name.upper()
+    if name_u in PROVIDER_BY_ENV_VAR:
+        return True
+    if any(name_u.endswith(s) for s in SUSPICIOUS_VAR_SUFFIXES):
+        # Filter out things that obviously aren't LLM keys.
+        if any(skip in name_u for skip in ("AWS_", "GITHUB_", "GH_", "NPM_", "PYPI_", "DOCKER_", "STRIPE_", "TWILIO_", "SLACK_", "SENTRY_", "DATADOG_", "DD_API")):
+            return False
+        return True
+    # Bare values without a known var name only count if they pattern-match.
+    return any(pat.fullmatch(value) for p in PROVIDERS for pat in p.value_patterns)
+
+
+def from_environment() -> list[Finding]:
+    out = []
+    for k, v in os.environ.items():
+        if _looks_like_key(k, v):
+            out.append(Finding(classify(v, k), k, v, "env"))
+    return out
+
+
+# Match `export FOO=bar`, `export FOO="bar"`, `FOO=bar`, `setenv FOO bar`.
+_RC_EXPORT = re.compile(
+    r"""^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=\s*(['"]?)([^'"\n#]+?)\2\s*(?:#.*)?$"""
+)
+_RC_SETENV = re.compile(r"""^\s*setenv\s+([A-Z][A-Z0-9_]*)\s+(['"]?)([^'"\n#]+?)\2\s*(?:#.*)?$""")
+_FISH_SET = re.compile(
+    r"""^\s*set\s+(?:-x\s+|-gx\s+|--export\s+)([A-Z][A-Z0-9_]*)\s+(['"]?)([^'"\n#]+?)\2\s*(?:#.*)?$"""
+)
+
+
+_COMMENT_LINE = re.compile(r"^\s*#\s?(.*?)\s*$")
+
+# Lines that look like commented-out shell code. We drop them from notes —
+# they're not user-facing prose, and they often embed full key values that
+# we don't want to print.
+_SHELLY_COMMENT = re.compile(
+    r"""^\s*(?:export|set|setenv|unset|alias|source|\.|sudo)\b|^\s*[A-Z_]+=""",
+    re.VERBOSE,
+)
+
+
+def _clean_note(raw: list[str]) -> str | None:
+    """Turn a raw comment block into a user-displayable note, or None."""
+    kept = []
+    for line in raw:
+        line = line.strip()
+        if not line:
+            continue
+        if _SHELLY_COMMENT.match(line):
+            continue
+        # Defense in depth: mask any key-shaped substring that slipped through.
+        line = _mask_keys_in_text(line)
+        kept.append(line)
+    if not kept:
+        return None
+    return "\n".join(kept)
+
+
+# Fallback masker for providers with no specific value pattern (Mistral,
+# DeepSeek, Cohere — their key shapes are too generic to use for
+# classification, but we still don't want a stale key in a prose comment to
+# print verbatim). Matches runs of 24+ key-shaped chars that contain at least
+# one letter AND one digit, which excludes English prose without much fuss.
+_GENERIC_KEY_LIKE = re.compile(r"[A-Za-z0-9_\-]{24,}")
+
+
+def _mask_keys_in_text(text: str) -> str:
+    """Replace any substring that looks like a key with a masked preview."""
+
+    def _mask(m: re.Match) -> str:
+        s = m.group(0)
+        return s[:8] + "…" + s[-4:] if len(s) > 12 else s[:4] + "…"
+
+    for p in PROVIDERS:
+        for pat in p.value_patterns:
+            text = pat.sub(_mask, text)
+
+    def _maybe_mask_generic(m: re.Match) -> str:
+        s = m.group(0)
+        if any(c.isalpha() for c in s) and any(c.isdigit() for c in s):
+            return _mask(m)
+        return s
+
+    text = _GENERIC_KEY_LIKE.sub(_maybe_mask_generic, text)
+    return text
+
+
+def _parse_shell_file(path: Path) -> list[tuple[str, str, str | None]]:
+    """Return (var_name, value, note) triples.
+
+    `note` is the contiguous block of comment lines immediately preceding the
+    export, with the `#` stripped, shell-code-looking lines dropped, and any
+    embedded key values masked. None if nothing usable remained.
+    """
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except (OSError, PermissionError):
+        return []
+    out: list[tuple[str, str, str | None]] = []
+    comment_buf: list[str] = []
+    for line in text.splitlines():
+        m_c = _COMMENT_LINE.match(line)
+        if m_c is not None:
+            comment_buf.append(m_c.group(1))
+            continue
+        if not line.strip():
+            comment_buf.clear()
+            continue
+        for pat in (_RC_EXPORT, _RC_SETENV, _FISH_SET):
+            m = pat.match(line)
+            if m:
+                out.append((m.group(1), m.group(3), _clean_note(comment_buf)))
+                break
+        comment_buf.clear()
+    return out
+
+
+SHELL_RC_FILES = [
+    HOME / ".zshrc",
+    HOME / ".zshenv",
+    HOME / ".zprofile",
+    HOME / ".zlogin",
+    HOME / ".bashrc",
+    HOME / ".bash_profile",
+    HOME / ".profile",
+    HOME / ".config" / "fish" / "config.fish",
+]
+
+
+def from_rc_files() -> list[Finding]:
+    out = []
+    for path in SHELL_RC_FILES:
+        if not path.exists():
+            continue
+        for name, val, note in _parse_shell_file(path):
+            if _looks_like_key(name, val):
+                out.append(Finding(classify(val, name), name, val, _short_path(path), note))
+    return out
+
+
+# .env files share the shell-export grammar.
+def _parse_env_file(path: Path) -> list[tuple[str, str, str | None]]:
+    return _parse_shell_file(path)
+
+
+# Curated list of "secrets-style" dotfiles at $HOME that people commonly use
+# to stash keys outside of .env. Parsed with the same shell-export grammar.
+HOME_SECRETS_FILES = (
+    ".env",
+    ".envrc",
+    ".credentials",
+    ".api_keys",
+    ".apikeys",
+    ".secrets",
+    ".tokens",
+    ".env.local",
+    ".env.secrets",
+)
+
+
+def from_env_files(extra_paths: Iterable[Path] = ()) -> list[Finding]:
+    """Scan curated dotfiles at $HOME, project .env files under common roots,
+    and any user-supplied extra files/directories.
+    """
+    out = []
+    seen_files: set[Path] = set()
+
+    def scan_file(p: Path) -> None:
+        if p in seen_files or not p.is_file():
+            return
+        seen_files.add(p)
+        for name, val, note in _parse_env_file(p):
+            if _looks_like_key(name, val):
+                out.append(Finding(classify(val, name), name, val, _short_path(p), note))
+
+    # Curated single-file locations at $HOME.
+    for name in HOME_SECRETS_FILES:
+        p = HOME / name
+        if p.exists():
+            scan_file(p)
+
+    # User-supplied extras: a file is scanned directly; a directory has its
+    # own .env files checked AND its immediate child dirs walked (so
+    # --paths /my/project picks up both /my/project/.env and
+    # /my/project/sub/.env).
+    extra_roots: list[Path] = []
+    for p in extra_paths:
+        if p.is_file():
+            scan_file(p)
+        elif p.is_dir():
+            for env_name in (".env", ".envrc", ".env.local"):
+                scan_file(p / env_name)
+            extra_roots.append(p)
+
+    # Walk common project roots one level deep, then look for .env/.envrc.
+    roots = extra_roots + [HOME / "git", HOME / "Documents", HOME / "Projects", HOME / "src", HOME / "code", HOME / "work", HOME / "Developer"]
+    for root in roots:
+        if not root.exists() or not root.is_dir():
+            continue
+        try:
+            children = list(root.iterdir())
+        except (OSError, PermissionError):
+            continue
+        for child in children:
+            if child.name.startswith(".") or not child.is_dir():
+                continue
+            for env_name in (".env", ".envrc", ".env.local"):
+                scan_file(child / env_name)
+    return out
+
+
+def from_provider_configs() -> list[Finding]:
+    """Look in known per-provider config dirs / files for plausible keys."""
+    out = []
+    for p in PROVIDERS:
+        for cfg in p.config_paths:
+            if not cfg.exists():
+                continue
+            files = []
+            if cfg.is_file():
+                files = [cfg]
+            elif cfg.is_dir():
+                try:
+                    files = [f for f in cfg.iterdir() if f.is_file()]
+                except (OSError, PermissionError):
+                    continue
+            for f in files:
+                try:
+                    text = f.read_text(encoding="utf-8", errors="replace")
+                except (OSError, PermissionError):
+                    continue
+                # Two strategies: parse as KEY=VAL (config/env style), and
+                # scan free-form text for known value patterns.
+                for name, val, note in _parse_env_file(f):
+                    if _looks_like_key(name, val):
+                        out.append(Finding(classify(val, name), name, val, _short_path(f), note))
+                for pat in p.value_patterns:
+                    for m in pat.finditer(text):
+                        out.append(Finding(p.name, None, m.group(0), _short_path(f)))
+                # Single-line bare-token files (e.g. ~/.cache/huggingface/token)
+                stripped = text.strip()
+                if stripped and "\n" not in stripped and len(stripped) < 400:
+                    for pat in p.value_patterns:
+                        if pat.fullmatch(stripped):
+                            out.append(Finding(p.name, None, stripped, _short_path(f)))
+                            break
+    return out
+
+
+def from_keychain() -> list[Finding]:
+    if sys.platform != "darwin":
+        return []
+    if not _have("security"):
+        return []
+    out = []
+    for p in PROVIDERS:
+        for svc in p.keychain_services:
+            value = _keychain_lookup(svc)
+            # Provider attribution is already authoritative (the Keychain entry
+            # is keyed by a service name we wrote into the provider table), so
+            # we skip _looks_like_key — it would drop valid keys for providers
+            # without value patterns (Mistral, DeepSeek, Cohere).
+            if value and 16 <= len(value) <= 400 and not any(c in value for c in " \t\n"):
+                out.append(Finding(p.name, None, value, f"keychain:{svc}"))
+    return out
+
+
+def _keychain_lookup(service: str) -> str | None:
+    try:
+        r = subprocess.run(
+            ["security", "find-generic-password", "-s", service, "-w"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    if r.returncode != 0:
+        return None
+    val = r.stdout.strip()
+    return val or None
+
+
+def _have(cmd: str) -> bool:
+    from shutil import which
+    return which(cmd) is not None
+
+
+def _short_path(p: Path) -> str:
+    try:
+        return "~/" + str(p.relative_to(HOME))
+    except ValueError:
+        return str(p)
+
+
+# ---------------------------------------------------------------------------
+# Aggregation
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class KeyRecord:
+    provider: str
+    value: str
+    sources: list[str] = field(default_factory=list)
+    var_names: set[str] = field(default_factory=set)
+    notes: list[str] = field(default_factory=list)
+    probe_result: dict | None = None
+    probe_error: str | None = None
+
+    def mask(self) -> str:
+        v = self.value
+        if len(v) <= 12:
+            return v[:4] + "…"
+        return v[:8] + "…" + v[-4:]
+
+
+def collapse(findings: list[Finding]) -> dict[str, list[KeyRecord]]:
+    """Group findings by provider, deduplicating identical key values."""
+    by_provider: dict[str, dict[str, KeyRecord]] = {}
+    for f in findings:
+        slot = by_provider.setdefault(f.provider, {})
+        rec = slot.get(f.value)
+        if rec is None:
+            rec = KeyRecord(provider=f.provider, value=f.value)
+            slot[f.value] = rec
+        if f.source not in rec.sources:
+            rec.sources.append(f.source)
+        if f.var_name:
+            rec.var_names.add(f.var_name)
+        if f.note and f.note not in rec.notes:
+            rec.notes.append(f.note)
+    return {prov: list(slot.values()) for prov, slot in by_provider.items()}
+
+
+# ---------------------------------------------------------------------------
+# Probing (concurrent)
+# ---------------------------------------------------------------------------
+
+
+def run_probes(records: dict[str, list[KeyRecord]]) -> None:
+    jobs: list[tuple[KeyRecord, Callable[[str], dict]]] = []
+    for provider_name, recs in records.items():
+        p = PROVIDER_BY_NAME.get(provider_name)
+        if not p or not p.probe:
+            continue
+        for rec in recs:
+            jobs.append((rec, p.probe))
+    if not jobs:
+        return
+    with ThreadPoolExecutor(max_workers=min(16, len(jobs))) as ex:
+        futures = {ex.submit(fn, rec.value): rec for rec, fn in jobs}
+        for fut in as_completed(futures):
+            rec = futures[fut]
+            try:
+                rec.probe_result = fut.result()
+            except Exception as e:  # noqa: BLE001 — probes shouldn't crash the run
+                rec.probe_error = f"{type(e).__name__}: {e}"
+
+
+# ---------------------------------------------------------------------------
+# Reporting
+# ---------------------------------------------------------------------------
+
+
+def _supports_color() -> bool:
+    return sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+
+
+class Style:
+    def __init__(self, enabled: bool):
+        e = enabled
+        self.bold = "\033[1m" if e else ""
+        self.dim = "\033[2m" if e else ""
+        self.green = "\033[32m" if e else ""
+        self.red = "\033[31m" if e else ""
+        self.yellow = "\033[33m" if e else ""
+        self.cyan = "\033[36m" if e else ""
+        self.reset = "\033[0m" if e else ""
+
+
+def render_human(records: dict[str, list[KeyRecord]], probed: bool, s: Style) -> str:
+    lines: list[str] = []
+    found_providers = [p.name for p in PROVIDERS if p.name in records and records[p.name]]
+    missing_providers = [p.name for p in PROVIDERS if p.name not in records or not records[p.name]]
+    unknown = records.get("Unknown", [])
+
+    lines.append(f"{s.bold}LLM API keys on this machine{s.reset}")
+    lines.append("")
+
+    for prov_name in found_providers:
+        recs = records[prov_name]
+        lines.append(f"{s.bold}{prov_name}{s.reset}")
+        for rec in recs:
+            sources = ", ".join(rec.sources)
+            var_part = f" [{', '.join(sorted(rec.var_names))}]" if rec.var_names else ""
+            lines.append(f"  {s.green}✓{s.reset} {rec.mask()}{var_part}")
+            lines.append(f"    {s.dim}sources:{s.reset} {sources}")
+            for n in rec.notes:
+                note_lines = n.split("\n")
+                lines.append(f"    {s.cyan}note:{s.reset} {note_lines[0]}")
+                for extra in note_lines[1:]:
+                    lines.append(f"          {extra}")
+            if probed:
+                lines.append("    " + _render_probe(rec, s))
+        if len(recs) > 1:
+            lines.append(f"  {s.yellow}⚠ {len(recs)} distinct {prov_name} keys found{s.reset}")
+        lines.append("")
+
+    if unknown:
+        lines.append(f"{s.bold}Unclassified{s.reset} {s.dim}(matched a generic key shape but no known provider){s.reset}")
+        for rec in unknown:
+            var_part = f" [{', '.join(sorted(rec.var_names))}]" if rec.var_names else ""
+            lines.append(f"  {s.yellow}?{s.reset} {rec.mask()}{var_part}")
+            lines.append(f"    {s.dim}sources:{s.reset} {', '.join(rec.sources)}")
+        lines.append("")
+
+    if missing_providers:
+        lines.append(f"{s.bold}Not found{s.reset} {s.dim}(no key on this machine){s.reset}")
+        lines.append("  " + ", ".join(missing_providers))
+        lines.append("")
+
+    # Summary line.
+    total_keys = sum(len(recs) for prov, recs in records.items() if prov != "Unknown")
+    summary = f"{len(found_providers)} provider(s) configured, {total_keys} key(s) total"
+    if unknown:
+        summary += f", {len(unknown)} unclassified"
+    lines.append(f"{s.dim}{summary}{s.reset}")
+    return "\n".join(lines)
+
+
+def _render_probe(rec: KeyRecord, s: Style) -> str:
+    if rec.probe_error:
+        return f"{s.red}probe failed:{s.reset} {rec.probe_error}"
+    r = rec.probe_result
+    if r is None:
+        # Reached when probing is on but this provider has probe=None
+        # (e.g. Perplexity — no free metadata endpoint, so we don't
+        # spend the user's credit just to authenticate).
+        p = PROVIDER_BY_NAME.get(rec.provider)
+        if p is not None and p.probe is None:
+            return f"{s.dim}probe: skipped (no free metadata endpoint){s.reset}"
+        return f"{s.dim}probe: skipped{s.reset}"
+    if not r.get("ok"):
+        status = r.get("status")
+        detail = r.get("detail") or ""
+        msg = f"HTTP {status}" + (f" — {detail}" if detail else "")
+        return f"{s.red}probe: rejected ({msg}){s.reset}"
+    parts = []
+    for k in ("user", "label", "role", "type"):
+        if r.get(k):
+            parts.append(f"{k}={r[k]}")
+    if r.get("orgs"):
+        parts.append(f"orgs={','.join(r['orgs'])}")
+    if r.get("models") is not None:
+        parts.append(f"{r['models']} models")
+    if "usage_usd" in r or "limit_usd" in r:
+        usage = r.get("usage_usd")
+        limit = r.get("limit_usd")
+        if limit is not None:
+            parts.append(f"usage=${usage}/${limit}")
+        else:
+            parts.append(f"usage=${usage}")
+    if r.get("free_tier"):
+        parts.append("free tier")
+    return f"{s.green}probe: ok{s.reset}" + (f" — {'; '.join(parts)}" if parts else "")
+
+
+def render_json(records: dict[str, list[KeyRecord]], probed: bool) -> str:
+    out = {"providers": {}, "unknown": []}
+    for prov_name in [p.name for p in PROVIDERS]:
+        recs = records.get(prov_name, [])
+        out["providers"][prov_name] = [
+            {
+                "masked": rec.mask(),
+                "sources": rec.sources,
+                "env_vars": sorted(rec.var_names),
+                "notes": rec.notes,
+                "probe": (
+                    {"error": rec.probe_error} if rec.probe_error
+                    else (rec.probe_result if probed else None)
+                ),
+            }
+            for rec in recs
+        ]
+    for rec in records.get("Unknown", []):
+        out["unknown"].append(
+            {
+                "masked": rec.mask(),
+                "sources": rec.sources,
+                "env_vars": sorted(rec.var_names),
+            }
+        )
+    return json.dumps(out, indent=2, default=str, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Scan this machine for LLM provider API keys."
+    )
+    parser.add_argument("--no-probe", action="store_true", help="Skip network calls; just discover and report keys.")
+    parser.add_argument("--json", action="store_true", help="Emit JSON instead of the human-readable report.")
+    parser.add_argument("--paths", nargs="*", default=[], metavar="DIR", help="Additional directories to scan for .env files (one level deep).")
+    parser.add_argument("--no-keychain", action="store_true", help="Skip macOS Keychain lookups.")
+    parser.add_argument("--no-color", action="store_true", help="Disable ANSI color in the human report.")
+    args = parser.parse_args(argv)
+
+    findings: list[Finding] = []
+    findings += from_environment()
+    findings += from_rc_files()
+    findings += from_env_files([Path(p).expanduser() for p in args.paths])
+    findings += from_provider_configs()
+    if not args.no_keychain:
+        findings += from_keychain()
+
+    records = collapse(findings)
+    if not args.no_probe:
+        run_probes(records)
+
+    if args.json:
+        print(render_json(records, probed=not args.no_probe))
+    else:
+        s = Style(enabled=_supports_color() and not args.no_color)
+        print(render_human(records, probed=not args.no_probe, s=s))
+
+    # Exit 0 always; this is a discovery tool, not a check.
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
