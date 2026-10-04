@@ -433,12 +433,22 @@ def fetch_world_bank_population(country_code: str) -> List[Dict]:
 
     url = WORLD_BANK_API.format(code=country_code.lower(), indicator=WORLD_BANK_INDICATOR)
     params = {"format": "json", "per_page": 20000, "date": "1800:2050"}
-    response = requests.get(url, params=params)
+    try:
+        response = requests.get(url, params=params, timeout=30)
+    except requests.RequestException as exc:
+        print(f"  World Bank unavailable for {country_code}: {exc}")
+        return []
     if response.status_code != 200:
         print(f"  ❌ World Bank error {response.status_code} for {country_code}")
         return []
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except (ValueError, requests.RequestException) as exc:
+        print(f"  Invalid World Bank response for {country_code}: {exc}")
+        return []
+    if not isinstance(payload, list):
+        return []
     if len(payload) < 2 or not isinstance(payload[1], list):
         print(f"  ⚠️  No World Bank data for {country_code}")
         return []
@@ -457,6 +467,8 @@ def load_maddison_dataset() -> pd.DataFrame:
 
     df = pd.read_excel(MADDISON_DATASET_URL, sheet_name="Full data")
     df = df.rename(columns={"countrycode": "country_code", "year": "year", "pop": "population"})
+    # MPD 2020 reports population in thousands; World Bank reports people.
+    df["population"] = pd.to_numeric(df["population"], errors="coerce") * 1000
     return df[["country_code", "year", "population", "country"]]
 
 
@@ -546,8 +558,8 @@ def calculate_population_fractions(df: pd.DataFrame) -> pd.DataFrame:
         DataFrame with population fractions calculated
     """
     # Get the most recent year's data for current population
-    latest_year = df['year'].max()
-    current_pop = df[df['year'] == latest_year][['country', 'country_code', 'population']].copy()
+    latest = df.sort_values('year').groupby('country_code', sort=False).tail(1)
+    current_pop = latest[['country', 'country_code', 'population']].copy()
     current_pop.columns = ['country', 'country_code', 'current_population']
 
     # Get historical peak for each country

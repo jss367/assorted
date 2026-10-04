@@ -45,3 +45,38 @@ def test_no_source_records_returns_empty_dataframe_with_schema(monkeypatch):
     result = source.fetch_all_country_data(["Taiwan"])
     assert result.empty
     assert list(result.columns) == ["country", "country_code", "year", "population"]
+
+
+def test_maddison_thousands_are_normalized_before_merging(monkeypatch):
+    raw = pd.DataFrame([{"countrycode": "ARE", "year": 1950, "pop": 2500, "country": "United Arab Emirates"}])
+    monkeypatch.setattr(source.pd, "read_excel", lambda *a, **k: raw.copy())
+    maddison = source.load_maddison_dataset()
+    merged = source.merge_population_series([{ "year": 2020, "population": 2000000}],
+        source.fetch_maddison_population("ARE", maddison))
+    merged["country"], merged["country_code"] = "United Arab Emirates", "ARE"
+    result = source.calculate_population_fractions(merged)
+    assert result.iloc[0]["peak_population"] == 2500000
+    assert result.iloc[0]["population_fraction"] == 0.8
+
+
+def test_latest_year_is_selected_separately_for_each_country():
+    rows = pd.DataFrame([
+        {"country": "Taiwan", "country_code": "TWN", "year": 1950, "population": 200},
+        {"country": "Taiwan", "country_code": "TWN", "year": 2018, "population": 100},
+        {"country": "United Arab Emirates", "country_code": "ARE", "year": 2025, "population": 300},
+    ])
+    result = source.calculate_population_fractions(rows).set_index("country_code")
+    assert set(result.index) == {"TWN", "ARE"}
+    assert result.loc["TWN", "population_fraction"] == 0.5
+
+
+@pytest.mark.parametrize("error", [source.requests.ConnectionError("offline"), ValueError("invalid JSON")])
+def test_world_bank_failures_leave_the_fallback_available(monkeypatch, error):
+    response = Mock(status_code=200)
+    if isinstance(error, source.requests.RequestException):
+        get = Mock(side_effect=error)
+    else:
+        response.json.side_effect = error
+        get = Mock(return_value=response)
+    monkeypatch.setattr(source.requests, "get", get)
+    assert source.fetch_world_bank_population("TWN") == []
