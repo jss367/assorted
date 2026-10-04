@@ -484,6 +484,10 @@ def fetch_maddison_population(country_code: str, maddison_df: pd.DataFrame) -> L
 
     country_data = maddison_df[(maddison_df["country_code"] == country_code)
                                & maddison_df["population"].notna()]
+    # MPD IRL through 1920 covers the whole island; World Bank IRL is the
+    # modern Republic. Exclude incompatible pre-partition observations.
+    if country_code == "IRL":
+        country_data = country_data[country_data["year"] >= 1921]
     if country_data.empty:
         return []
 
@@ -637,7 +641,10 @@ def write_map_html(fig, path):
         '<a href="https://www.rug.nl/ggdc/historicaldevelopment/maddison/releases/'
         'maddison-project-database-2020?lang=en">Dataset and attribution terms</a>.</p>'
         '<details><summary>Original sources from the MPD 2020 Sources worksheet</summary>'
-        + table + '</details></section>')
+        + table + '</details><p>Ireland: historical comparison starts in 1921; '
+        'earlier all-island estimates are excluded to match the modern Republic. '
+        '<a href="https://nationalarchives.ie/collections/search-the-census/about-the-census-collections/">'
+        'Irish census geography</a>.</p></section>')
     html = fig.to_html(full_html=True, include_plotlyjs=True)
     Path(path).write_text(html.replace('</body>', bibliography + '</body>'), encoding='utf-8')
 

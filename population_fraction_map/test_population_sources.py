@@ -112,3 +112,11 @@ def test_maddison_failure_preserves_world_bank_only_generation(monkeypatch, erro
     monkeypatch.setattr(source.time, "sleep", lambda _: None)
     result = source.fetch_all_country_data(["United States"])
     assert list(result["population"]) == [100.]
+
+
+def test_ireland_excludes_pre_partition_island_population():
+    data = pd.DataFrame([
+        {"country_code": "IRL", "year": 1920, "population": 4361000},
+        {"country_code": "IRL", "year": 1921, "population": 3096000},
+    ])
+    assert source.fetch_maddison_population("IRL", data) == [{"year": 1921, "population": 3096000}]
