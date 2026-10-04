@@ -1,4 +1,6 @@
 import time
+import json
+from html import escape
 from pathlib import Path
 from typing import Dict, List
 
@@ -475,7 +477,8 @@ def load_maddison_dataset() -> pd.DataFrame:
 def fetch_maddison_population(country_code: str, maddison_df: pd.DataFrame) -> List[Dict]:
     """Return Maddison Project records for a single ISO3 code."""
 
-    country_data = maddison_df[maddison_df["country_code"] == country_code]
+    country_data = maddison_df[(maddison_df["country_code"] == country_code)
+                               & maddison_df["population"].notna()]
     if country_data.empty:
         return []
 
@@ -558,6 +561,7 @@ def calculate_population_fractions(df: pd.DataFrame) -> pd.DataFrame:
         DataFrame with population fractions calculated
     """
     # Get the most recent year's data for current population
+    df = df.dropna(subset=['population'])
     latest = df.sort_values('year').groupby('country_code', sort=False).tail(1)
     current_pop = latest[['country', 'country_code', 'population']].copy()
     current_pop.columns = ['country', 'country_code', 'current_population']
@@ -616,6 +620,23 @@ def create_map(df_fractions: pd.DataFrame) -> object:
     return fig
 
 
+def write_map_html(fig, path):
+    """Save the interactive map with the original MPD bibliography attached."""
+    citations = json.loads(Path(__file__).with_name('maddison_sources.json').read_text())
+    table = '<table>' + ''.join('<tr>' + ''.join('<td>' + escape(cell) + '</td>' for cell in row)
+                               + '</tr>' for row in citations if any(row)) + '</table>'
+    bibliography = ('<section style="margin:2rem;font-family:sans-serif"><h2>Data sources</h2>'
+        '<p>Modern population: World Bank, indicator SP.POP.TOTL. Historical population: '
+        'Maddison Project Database, version 2020. Bolt, Jutta and Jan Luiten van Zanden (2020), '
+        '“Maddison style estimates of the evolution of the world economy. A new 2020 update”. '
+        '<a href="https://www.rug.nl/ggdc/historicaldevelopment/maddison/releases/'
+        'maddison-project-database-2020?lang=en">Dataset and attribution terms</a>.</p>'
+        '<details><summary>Original sources from the MPD 2020 Sources worksheet</summary>'
+        + table + '</details></section>')
+    html = fig.to_html(full_html=True, include_plotlyjs=True)
+    Path(path).write_text(html.replace('</body>', bibliography + '</body>'), encoding='utf-8')
+
+
 def main():
     """Main execution function."""
 
@@ -663,7 +684,7 @@ def main():
     output_html = script_dir / 'population_fraction_map.html'
     output_csv = script_dir / 'population_fractions.csv'
 
-    fig.write_html(output_html)
+    write_map_html(fig, output_html)
     print(f"✅ Map saved to: {output_html}")
 
     df_fractions.sort_values('population_fraction').to_csv(output_csv, index=False)

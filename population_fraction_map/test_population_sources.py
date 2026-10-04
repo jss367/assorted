@@ -80,3 +80,26 @@ def test_world_bank_failures_leave_the_fallback_available(monkeypatch, error):
         get = Mock(return_value=response)
     monkeypatch.setattr(source.requests, "get", get)
     assert source.fetch_world_bank_population("TWN") == []
+
+
+def test_missing_maddison_population_does_not_hide_latest_valid_value():
+    data = pd.DataFrame([
+        {"country_code": "TWN", "year": 2017, "population": 100},
+        {"country_code": "TWN", "year": 2018, "population": float("nan")},
+    ])
+    records = source.fetch_maddison_population("TWN", data)
+    assert records == [{"year": 2017, "population": 100.}]
+    data["country"] = "Taiwan"
+    result = source.calculate_population_fractions(data)
+    assert result.iloc[0]["current_population"] == 100
+
+
+def test_map_export_includes_original_source_bibliography(tmp_path):
+    fig = Mock()
+    fig.to_html.return_value = '<html><body>map</body></html>'
+    path = tmp_path / 'map.html'
+    source.write_map_html(fig, path)
+    html = path.read_text()
+    assert 'Bolt, Jutta and Jan Luiten van Zanden (2020)' in html
+    assert 'Prados de la Escosura' in html
+    assert 'Original sources' in html
