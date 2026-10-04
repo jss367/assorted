@@ -1,15 +1,18 @@
-import os
 import time
+import json
+from html import escape
+from zipfile import BadZipFile
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 import pandas as pd
 import plotly.express as px
 import requests
 
-# API Configuration
-API_KEY = os.getenv("API_NINJAS_API_KEY")
-API_BASE_URL = "https://api.api-ninjas.com/v1/population"
+# Data configuration
+WORLD_BANK_INDICATOR = "SP.POP.TOTL"  # Population, total (UN/World Bank)
+WORLD_BANK_API = "https://api.worldbank.org/v2/country/{code}/indicator/{indicator}"
+MADDISON_DATASET_URL = "https://www.rug.nl/ggdc/historicaldevelopment/maddison/data/mpd2020.xlsx"
 
 # List of countries to query (you can expand this list)
 # Using a mix of full names and ISO codes
@@ -221,169 +224,337 @@ COUNTRIES = [
 ]
 
 
-def get_population_data_for_country(country_name: str, api_key: str) -> Dict:
-    """
-    Fetch historical population data for a single country from API Ninjas.
+def get_country_iso3_mapping() -> Dict[str, str]:
+    """Explicit ISO3 identifiers for every configured country."""
+    return {
+        'United States': 'USA',
+        'China': 'CHN',
+        'India': 'IND',
+        'Indonesia': 'IDN',
+        'Pakistan': 'PAK',
+        'Brazil': 'BRA',
+        'Nigeria': 'NGA',
+        'Bangladesh': 'BGD',
+        'Russia': 'RUS',
+        'Mexico': 'MEX',
+        'Japan': 'JPN',
+        'Ethiopia': 'ETH',
+        'Philippines': 'PHL',
+        'Egypt': 'EGY',
+        'Vietnam': 'VNM',
+        'DR Congo': 'COD',
+        'Turkey': 'TUR',
+        'Iran': 'IRN',
+        'Germany': 'DEU',
+        'Thailand': 'THA',
+        'United Kingdom': 'GBR',
+        'France': 'FRA',
+        'Italy': 'ITA',
+        'South Africa': 'ZAF',
+        'South Korea': 'KOR',
+        'Spain': 'ESP',
+        'Argentina': 'ARG',
+        'Ukraine': 'UKR',
+        'Poland': 'POL',
+        'Canada': 'CAN',
+        'Australia': 'AUS',
+        'Romania': 'ROU',
+        'Chile': 'CHL',
+        'Netherlands': 'NLD',
+        'Ecuador': 'ECU',
+        'Guatemala': 'GTM',
+        'Belgium': 'BEL',
+        'Czech Republic': 'CZE',
+        'Greece': 'GRC',
+        'Portugal': 'PRT',
+        'Sweden': 'SWE',
+        'Hungary': 'HUN',
+        'Belarus': 'BLR',
+        'Austria': 'AUT',
+        'Serbia': 'SRB',
+        'Switzerland': 'CHE',
+        'Bulgaria': 'BGR',
+        'Denmark': 'DNK',
+        'Finland': 'FIN',
+        'Slovakia': 'SVK',
+        'Norway': 'NOR',
+        'Ireland': 'IRL',
+        'Croatia': 'HRV',
+        'Moldova': 'MDA',
+        'Georgia': 'GEO',
+        'Uruguay': 'URY',
+        'Bosnia and Herzegovina': 'BIH',
+        'Albania': 'ALB',
+        'Lithuania': 'LTU',
+        'Slovenia': 'SVN',
+        'Latvia': 'LVA',
+        'Estonia': 'EST',
+        'North Macedonia': 'MKD',
+        'Luxembourg': 'LUX',
+        'Montenegro': 'MNE',
+        'Malta': 'MLT',
+        'Iceland': 'ISL',
+        'Andorra': 'AND',
+        'Liechtenstein': 'LIE',
+        'Monaco': 'MCO',
+        'San Marino': 'SMR',
+        'Vatican City': 'VAT',
+        'Puerto Rico': 'PRI',
+        'Hong Kong': 'HKG',
+        'Singapore': 'SGP',
+        'Tanzania': 'TZA',
+        'Myanmar': 'MMR',
+        'Kenya': 'KEN',
+        'Colombia': 'COL',
+        'Algeria': 'DZA',
+        'Sudan': 'SDN',
+        'Uganda': 'UGA',
+        'Iraq': 'IRQ',
+        'Afghanistan': 'AFG',
+        'Morocco': 'MAR',
+        'Saudi Arabia': 'SAU',
+        'Uzbekistan': 'UZB',
+        'Peru': 'PER',
+        'Angola': 'AGO',
+        'Malaysia': 'MYS',
+        'Mozambique': 'MOZ',
+        'Ghana': 'GHA',
+        'Yemen': 'YEM',
+        'Nepal': 'NPL',
+        'Venezuela': 'VEN',
+        'Madagascar': 'MDG',
+        'North Korea': 'PRK',
+        'Cameroon': 'CMR',
+        'Niger': 'NER',
+        'Taiwan': 'TWN',
+        'Mali': 'MLI',
+        'Burkina Faso': 'BFA',
+        'Syria': 'SYR',
+        'Sri Lanka': 'LKA',
+        'Malawi': 'MWI',
+        'Zambia': 'ZMB',
+        'Kazakhstan': 'KAZ',
+        'Cambodia': 'KHM',
+        'Senegal': 'SEN',
+        'Chad': 'TCD',
+        'Somalia': 'SOM',
+        'Zimbabwe': 'ZWE',
+        'Guinea': 'GIN',
+        'Rwanda': 'RWA',
+        'Benin': 'BEN',
+        'Tunisia': 'TUN',
+        'Bolivia': 'BOL',
+        'Haiti': 'HTI',
+        'Cuba': 'CUB',
+        'South Sudan': 'SSD',
+        'Dominican Republic': 'DOM',
+        'Jordan': 'JOR',
+        'Azerbaijan': 'AZE',
+        'Honduras': 'HND',
+        'United Arab Emirates': 'ARE',
+        'Tajikistan': 'TJK',
+        'Papua New Guinea': 'PNG',
+        'Israel': 'ISR',
+        'Togo': 'TGO',
+        'Sierra Leone': 'SLE',
+        'Laos': 'LAO',
+        'Paraguay': 'PRY',
+        'Libya': 'LBY',
+        'Lebanon': 'LBN',
+        'Nicaragua': 'NIC',
+        'Kyrgyzstan': 'KGZ',
+        'El Salvador': 'SLV',
+        'Turkmenistan': 'TKM',
+        'Congo': 'COG',
+        'Oman': 'OMN',
+        'Palestine': 'PSE',
+        'Costa Rica': 'CRI',
+        'Liberia': 'LBR',
+        'Central African Republic': 'CAF',
+        'New Zealand': 'NZL',
+        'Mauritania': 'MRT',
+        'Panama': 'PAN',
+        'Kuwait': 'KWT',
+        'Eritrea': 'ERI',
+        'Mongolia': 'MNG',
+        'Armenia': 'ARM',
+        'Jamaica': 'JAM',
+        'Qatar': 'QAT',
+        'Namibia': 'NAM',
+        'Gambia': 'GMB',
+        'Botswana': 'BWA',
+        'Gabon': 'GAB',
+        'Lesotho': 'LSO',
+        'Guinea-Bissau': 'GNB',
+        'Bahrain': 'BHR',
+        'Equatorial Guinea': 'GNQ',
+        'Trinidad and Tobago': 'TTO',
+        'Timor-Leste': 'TLS',
+        'Mauritius': 'MUS',
+        'Cyprus': 'CYP',
+        'Eswatini': 'SWZ',
+        'Djibouti': 'DJI',
+        'Fiji': 'FJI',
+        'Reunion': 'REU',
+        'Comoros': 'COM',
+        'Guyana': 'GUY',
+        'Bhutan': 'BTN',
+        'Solomon Islands': 'SLB',
+        'Macao': 'MAC',
+        'Suriname': 'SUR',
+        'Cabo Verde': 'CPV',
+        'Maldives': 'MDV',
+        'Brunei': 'BRN',
+        'Belize': 'BLZ',
+        'Bahamas': 'BHS',
+        'Vanuatu': 'VUT',
+        'Barbados': 'BRB',
+        'Sao Tome & Principe': 'STP',
+        'Samoa': 'WSM',
+        'Saint Lucia': 'LCA',
+        'Kiribati': 'KIR',
+        'Micronesia': 'FSM',
+        'Grenada': 'GRD',
+        'Saint Vincent & the Grenadines': 'VCT',
+        'Tonga': 'TON',
+        'Seychelles': 'SYC',
+        'Antigua and Barbuda': 'ATG',
+        'Dominica': 'DMA',
+        'Saint Kitts & Nevis': 'KNA',
+        'Palau': 'PLW',
+        'Nauru': 'NRU',
+        'Tuvalu': 'TUV',
+    }
 
-    Args:
-        country_name: Name of the country
-        api_key: API key for API Ninjas
 
-    Returns:
-        Dictionary with country data or None if request fails
+def fetch_world_bank_population(country_code: str) -> List[Dict]:
+    """Fetch World Bank population series for a country.
+
+    Uses the standard population indicator (UN/World Bank) and requests all
+    available years in one go.
     """
-    headers = {'X-Api-Key': api_key}
-    params = {'country': country_name}
+
+    url = WORLD_BANK_API.format(code=country_code.lower(), indicator=WORLD_BANK_INDICATOR)
+    params = {"format": "json", "per_page": 20000, "date": "1800:2050"}
+    try:
+        response = requests.get(url, params=params, timeout=30)
+    except requests.RequestException as exc:
+        print(f"  World Bank unavailable for {country_code}: {exc}")
+        return []
+    if response.status_code != 200:
+        print(f"  ❌ World Bank error {response.status_code} for {country_code}")
+        return []
 
     try:
-        response = requests.get(API_BASE_URL, headers=headers, params=params)
+        payload = response.json()
+    except (ValueError, requests.RequestException) as exc:
+        print(f"  Invalid World Bank response for {country_code}: {exc}")
+        return []
+    if not isinstance(payload, list):
+        return []
+    if len(payload) < 2 or not isinstance(payload[1], list):
+        print(f"  ⚠️  No World Bank data for {country_code}")
+        return []
 
-        if response.status_code == 200:
-            data = response.json()
-            if data and 'country_name' in data:
-                return data
-            else:
-                print(f"  ⚠️  No data returned for {country_name}")
-                return None
-        else:
-            print(f"  ❌ Error {response.status_code} for {country_name}")
-            return None
+    wb_records = []
+    for entry in payload[1]:
+        if entry.get("value") is None:
+            continue
+        wb_records.append({"year": int(entry["date"]), "population": int(entry["value"])})
 
-    except Exception as e:
-        print(f"  ❌ Exception for {country_name}: {str(e)}")
-        return None
-
-
-def get_country_iso3_mapping() -> Dict[str, str]:
-    """
-    Create a mapping of country names to ISO3 codes.
-    This is a simplified version - you may need to expand this.
-    """
-    mapping = {
-        "United States": "USA",
-        "China": "CHN",
-        "India": "IND",
-        "Indonesia": "IDN",
-        "Pakistan": "PAK",
-        "Brazil": "BRA",
-        "Nigeria": "NGA",
-        "Bangladesh": "BGD",
-        "Russia": "RUS",
-        "Mexico": "MEX",
-        "Japan": "JPN",
-        "Ethiopia": "ETH",
-        "Philippines": "PHL",
-        "Egypt": "EGY",
-        "Vietnam": "VNM",
-        "DR Congo": "COD",
-        "Turkey": "TUR",
-        "Iran": "IRN",
-        "Germany": "DEU",
-        "Thailand": "THA",
-        "United Kingdom": "GBR",
-        "France": "FRA",
-        "Italy": "ITA",
-        "South Africa": "ZAF",
-        "South Korea": "KOR",
-        "Spain": "ESP",
-        "Argentina": "ARG",
-        "Ukraine": "UKR",
-        "Poland": "POL",
-        "Canada": "CAN",
-        "Australia": "AUS",
-        "Romania": "ROU",
-        "Chile": "CHL",
-        "Netherlands": "NLD",
-        "Ecuador": "ECU",
-        "Guatemala": "GTM",
-        "Belgium": "BEL",
-        "Czech Republic": "CZE",
-        "Greece": "GRC",
-        "Portugal": "PRT",
-        "Sweden": "SWE",
-        "Hungary": "HUN",
-        "Belarus": "BLR",
-        "Austria": "AUT",
-        "Serbia": "SRB",
-        "Switzerland": "CHE",
-        "Bulgaria": "BGR",
-        "Denmark": "DNK",
-        "Finland": "FIN",
-        "Slovakia": "SVK",
-        "Norway": "NOR",
-        "Ireland": "IRL",
-        "Croatia": "HRV",
-        "Moldova": "MDA",
-        "Georgia": "GEO",
-        "Uruguay": "URY",
-        "Bosnia and Herzegovina": "BIH",
-        "Albania": "ALB",
-        "Lithuania": "LTU",
-        "Slovenia": "SVN",
-        "Latvia": "LVA",
-        "Estonia": "EST",
-        "North Macedonia": "MKD",
-        "Luxembourg": "LUX",
-        "Montenegro": "MNE",
-        "Malta": "MLT",
-        "Iceland": "ISL",
-        "Andorra": "AND",
-        "Liechtenstein": "LIE",
-        "Monaco": "MCO",
-        "San Marino": "SMR",
-        "Vatican City": "VAT",
-        "Puerto Rico": "PRI",
-        "Hong Kong": "HKG",
-        "Singapore": "SGP",
-    }
-    return mapping
+    return wb_records
 
 
-def fetch_all_country_data(countries: list[str], api_key: str) -> pd.DataFrame:
-    """
-    Fetch population data for all countries and compile into a dataframe.
+def load_maddison_dataset() -> pd.DataFrame:
+    """Download the Maddison Project population dataset (2020 release)."""
 
-    Args:
+    try:
+        df = pd.read_excel(MADDISON_DATASET_URL, sheet_name="Full data")
+    except (OSError, ValueError, ImportError, BadZipFile, requests.RequestException) as exc:
+        print(f"  Maddison unavailable: {exc}; continuing with World Bank.")
+        return pd.DataFrame(columns=["country_code", "year", "population", "country"])
+    df = df.rename(columns={"countrycode": "country_code", "year": "year", "pop": "population"})
+    # MPD 2020 reports population in thousands; World Bank reports people.
+    df["population"] = pd.to_numeric(df["population"], errors="coerce") * 1000
+    return df[["country_code", "year", "population", "country"]]
 
-        api_key: API key for API Ninjas
 
-    Returns:
-        DataFrame with historical population data
-    """
+def fetch_maddison_population(country_code: str, maddison_df: pd.DataFrame) -> List[Dict]:
+    """Return Maddison Project records for a single ISO3 code."""
+
+    country_data = maddison_df[(maddison_df["country_code"] == country_code)
+                               & maddison_df["population"].notna()]
+    # MPD IRL through 1920 covers the whole island; World Bank IRL is the
+    # modern Republic. Exclude incompatible pre-partition observations.
+    if country_code == "IRL":
+        country_data = country_data[country_data["year"] >= 1921]
+    if country_data.empty:
+        return []
+
+    return country_data[["year", "population"]].to_dict(orient="records")
+
+
+def merge_population_series(wb_records: List[Dict], maddison_records: List[Dict]) -> pd.DataFrame:
+    """Combine World Bank and Maddison series, favoring World Bank where overlapping."""
+
+    wb_df = pd.DataFrame(wb_records)
+    maddison_df = pd.DataFrame(maddison_records)
+
+    if wb_df.empty and maddison_df.empty:
+        return pd.DataFrame(columns=["year", "population"])
+
+    if wb_df.empty:
+        return maddison_df
+
+    if maddison_df.empty:
+        return wb_df
+
+    wb_df = wb_df.set_index("year")
+    maddison_df = maddison_df.set_index("year")
+
+    merged = maddison_df.combine_first(wb_df)
+    merged.update(wb_df)
+    return merged.reset_index()
+
+
+def fetch_all_country_data(countries: list[str]) -> pd.DataFrame:
+    """Fetch population data for all countries and compile into a dataframe."""
+
     all_data = []
     iso3_mapping = get_country_iso3_mapping()
+    unknown = sorted(set(countries) - iso3_mapping.keys())
+    if unknown:
+        raise ValueError(f"No ISO3 mapping for: {', '.join(unknown)}")
+    maddison_df = load_maddison_dataset()
 
     print(f"Fetching data for {len(countries)} countries...")
-    print("This may take a few minutes due to API rate limits.\n")
+    print("Using World Bank (UN) for modern data and Maddison Project for long-run history.\n")
 
     for i, country in enumerate(countries, 1):
         print(f"[{i}/{len(countries)}] Fetching {country}...", end=" ")
 
-        data = get_population_data_for_country(country, api_key)
+        iso3 = iso3_mapping[country]
+        wb_records = fetch_world_bank_population(iso3)
+        maddison_records = fetch_maddison_population(iso3, maddison_df)
+        merged = merge_population_series(wb_records, maddison_records)
 
-        if data and 'historical_population' in data:
-            country_name = data['country_name']
-            iso3 = iso3_mapping.get(country_name, country_name[:3].upper())
-
-            # Extract historical population data
-            for year_data in data['historical_population']:
+        if not merged.empty:
+            for _, row in merged.iterrows():
                 all_data.append(
                     {
-                        'country': country_name,
-                        'country_code': iso3,
-                        'year': year_data['year'],
-                        'population': year_data['population'],
+                        "country": country,
+                        "country_code": iso3,
+                        "year": int(row["year"]),
+                        "population": float(row["population"]),
                     }
                 )
-
             print("✓")
         else:
-            print("")
+            print("⚠️  no data")
 
-        # Be nice to the API - add a small delay
-        time.sleep(0.1)
+        time.sleep(0.05)
 
-    df = pd.DataFrame(all_data)
+    df = pd.DataFrame(all_data, columns=["country", "country_code", "year", "population"])
     print(f"\n✅ Successfully fetched data for {df['country'].nunique()} countries")
     return df
 
@@ -399,8 +570,9 @@ def calculate_population_fractions(df: pd.DataFrame) -> pd.DataFrame:
         DataFrame with population fractions calculated
     """
     # Get the most recent year's data for current population
-    latest_year = df['year'].max()
-    current_pop = df[df['year'] == latest_year][['country', 'country_code', 'population']].copy()
+    df = df.dropna(subset=['population'])
+    latest = df.sort_values('year').groupby('country_code', sort=False).tail(1)
+    current_pop = latest[['country', 'country_code', 'population']].copy()
     current_pop.columns = ['country', 'country_code', 'current_population']
 
     # Get historical peak for each country
@@ -447,7 +619,7 @@ def create_map(df_fractions: pd.DataFrame) -> object:
             'current_population': 'Current Population',
             'peak_population': 'Peak Population',
         },
-        title='Countries\' Current Population as Fraction of Historical Peak (API Ninjas Data)',
+        title="Countries' Current Population as Fraction of Historical Peak (World Bank + Maddison)",
     )
 
     fig.update_layout(
@@ -457,17 +629,37 @@ def create_map(df_fractions: pd.DataFrame) -> object:
     return fig
 
 
+def write_map_html(fig, path):
+    """Save the interactive map with the original MPD bibliography attached."""
+    citations = json.loads(Path(__file__).with_name('maddison_sources.json').read_text())
+    table = '<table>' + ''.join('<tr>' + ''.join('<td>' + escape(cell) + '</td>' for cell in row)
+                               + '</tr>' for row in citations if any(row)) + '</table>'
+    bibliography = ('<section style="margin:2rem;font-family:sans-serif"><h2>Data sources</h2>'
+        '<p>Modern population: World Bank, indicator SP.POP.TOTL. Historical population: '
+        'Maddison Project Database, version 2020. Bolt, Jutta and Jan Luiten van Zanden (2020), '
+        '“Maddison style estimates of the evolution of the world economy. A new 2020 update”. '
+        '<a href="https://www.rug.nl/ggdc/historicaldevelopment/maddison/releases/'
+        'maddison-project-database-2020?lang=en">Dataset and attribution terms</a>.</p>'
+        '<details><summary>Original sources from the MPD 2020 Sources worksheet</summary>'
+        + table + '</details><p>Ireland: historical comparison starts in 1921; '
+        'earlier all-island estimates are excluded to match the modern Republic. '
+        '<a href="https://nationalarchives.ie/collections/search-the-census/about-the-census-collections/">'
+        'Irish census geography</a>.</p></section>')
+    html = fig.to_html(full_html=True, include_plotlyjs=True)
+    Path(path).write_text(html.replace('</body>', bibliography + '</body>'), encoding='utf-8')
+
+
 def main():
     """Main execution function."""
 
-    # Fetch data from API
+    # Fetch data from World Bank and Maddison Project
     print("=" * 70)
-    print("FETCHING POPULATION DATA FROM API")
+    print("FETCHING POPULATION DATA FROM WORLD BANK + MADDISON")
     print("=" * 70)
-    df = fetch_all_country_data(COUNTRIES, API_KEY)
+    df = fetch_all_country_data(COUNTRIES)
 
     if df.empty:
-        print("\n❌ No data was fetched. Please check your API key and internet connection.")
+        print("\n❌ No data was fetched. Please check your internet connection.")
         return
 
     # Calculate fractions
@@ -504,7 +696,7 @@ def main():
     output_html = script_dir / 'population_fraction_map.html'
     output_csv = script_dir / 'population_fractions.csv'
 
-    fig.write_html(output_html)
+    write_map_html(fig, output_html)
     print(f"✅ Map saved to: {output_html}")
 
     df_fractions.sort_values('population_fraction').to_csv(output_csv, index=False)
