@@ -103,3 +103,12 @@ def test_map_export_includes_original_source_bibliography(tmp_path):
     assert 'Bolt, Jutta and Jan Luiten van Zanden (2020)' in html
     assert 'Prados de la Escosura' in html
     assert 'Original sources' in html
+
+
+@pytest.mark.parametrize("error", [OSError("unavailable"), ValueError("unreadable workbook"), source.BadZipFile("bad workbook")])
+def test_maddison_failure_preserves_world_bank_only_generation(monkeypatch, error):
+    monkeypatch.setattr(source.pd, "read_excel", Mock(side_effect=error))
+    monkeypatch.setattr(source, "fetch_world_bank_population", lambda _: [{"year": 2025, "population": 100}])
+    monkeypatch.setattr(source.time, "sleep", lambda _: None)
+    result = source.fetch_all_country_data(["United States"])
+    assert list(result["population"]) == [100.]

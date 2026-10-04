@@ -1,6 +1,7 @@
 import time
 import json
 from html import escape
+from zipfile import BadZipFile
 from pathlib import Path
 from typing import Dict, List
 
@@ -467,7 +468,11 @@ def fetch_world_bank_population(country_code: str) -> List[Dict]:
 def load_maddison_dataset() -> pd.DataFrame:
     """Download the Maddison Project population dataset (2020 release)."""
 
-    df = pd.read_excel(MADDISON_DATASET_URL, sheet_name="Full data")
+    try:
+        df = pd.read_excel(MADDISON_DATASET_URL, sheet_name="Full data")
+    except (OSError, ValueError, BadZipFile, requests.RequestException) as exc:
+        print(f"  Maddison unavailable: {exc}; continuing with World Bank.")
+        return pd.DataFrame(columns=["country_code", "year", "population", "country"])
     df = df.rename(columns={"countrycode": "country_code", "year": "year", "pop": "population"})
     # MPD 2020 reports population in thousands; World Bank reports people.
     df["population"] = pd.to_numeric(df["population"], errors="coerce") * 1000
