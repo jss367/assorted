@@ -26,19 +26,21 @@ The snapshot's first slow step is `system_profiler SPDisplaysDataType`, which pr
 
 ## When the monitors don't come up
 
-1. Record the broken state before changing anything:
+1. Start a snapshot while the monitors are broken. The `bad` label records the starting condition; the display probe may coincide with recovery, so the snapshot can contain transition or recovered state rather than a purely broken baseline:
 
    ```bash
    ./snapshot.sh bad
    ```
 
-   The snapshot probes the displays, which fixed a frozen picture once (see above). If the monitors come back, take a `good` snapshot right away and note that the probe fixed it.
+   If the monitors come back during the snapshot, run `./snapshot.sh good` right away and record that recovery coincided with the snapshot. The display probe is only a suspected trigger; this does not establish that it caused the recovery.
 
-2. If they're still broken, probe the displays once more to see whether the fix repeats:
+2. If they're still broken, try the display probe on its own to check whether recovery coincides with it:
 
    ```bash
    system_profiler SPDisplaysDataType > /dev/null
    ```
+
+   If the monitors come back, run `./snapshot.sh good` right away and record that recovery followed the standalone probe, along with the time it happened.
 
 3. If that doesn't help, restart the DisplayLink agent instead of replugging:
 
@@ -67,4 +69,4 @@ Snapshots stay outside this repo because they contain device serial numbers, win
 
 If any part of the capture fails, the script names the failed parts and exits nonzero.
 
-The script doesn't change any settings, but its display probe can make the DisplayLink agent restart its capture streams. `log show` may take a minute.
+The script doesn't change any settings, but running its display probe may coincide with the DisplayLink agent restarting its capture streams. Whether the probe causes the restart is unconfirmed. `log show` may take a minute.
