@@ -14,7 +14,8 @@ fi
 
 root=~/dock-debug
 out=$root/$(date +%Y%m%d-%H%M%S)-$label
-if ! mkdir -p $out || ! chmod 700 $root $out; then
+# mkdir without -p on the leaf, so two runs can't share a snapshot dir.
+if ! mkdir -p $root || ! chmod 700 $root || ! mkdir $out; then
   echo "could not create $out" >&2
   exit 1
 fi
