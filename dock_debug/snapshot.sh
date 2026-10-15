@@ -3,9 +3,23 @@
 # Captures Wavlink/DisplayLink dock state for diffing working vs broken.
 # Snapshots go to ~/dock-debug/, outside this repo: they contain device
 # serial numbers, window titles, and crash reports.
+setopt pipefail
+umask 077
+
 label=${1:-snap}
-out=~/dock-debug/$(date +%Y%m%d-%H%M%S)-$label
-mkdir -p $out
+if [[ $label == */* || $label == .* ]]; then
+  echo "label must be a plain name (no '/' or leading '.'): $label" >&2
+  exit 2
+fi
+
+root=~/dock-debug
+out=$root/$(date +%Y%m%d-%H%M%S)-$label
+if ! mkdir -p $out || ! chmod 700 $root $out; then
+  echo "could not create $out" >&2
+  exit 1
+fi
+
+failed=()
 {
   date; sw_vers
   echo "DisplayLink Manager: $(defaults read '/Applications/DisplayLink Manager.app/Contents/Info' CFBundleShortVersionString 2>/dev/null)"
@@ -14,10 +28,25 @@ mkdir -p $out
   echo; echo "== Displays"; system_profiler SPDisplaysDataType
   echo; echo "== DisplayLink USB device"; system_profiler SPUSBHostDataType | grep -B3 -A10 -i displaylink
   echo; echo "== Thunderbolt"; system_profiler SPThunderboltDataType
-} > $out/summary.txt 2>&1
-/usr/bin/log show --last 20m --style compact 2>/dev/null \
+} > $out/summary.txt 2>&1 || failed+=(summary.txt)
+
+# One log read feeds both files. grep exits 1 on no matches, which is a valid empty capture.
+logs=$(/usr/bin/log show --last 20m --style compact) || failed+=("log show")
+print -r -- $logs \
   | grep -E 'chimeOnAttach" age:00:00:00|Display:Virtual    \] Will bring display|DisplayLinkUserAgent.* E  |launchd.*displaylink.*(exited|crashed)|ScreenCaptureKit.*ERROR' \
   > $out/timeline.log
-/usr/bin/log show --last 20m --style compact 2>/dev/null | grep -i -E 'displaylink|thunderbolt|Display:Virtual' | grep -v -E 'SCRunningApplication|SCWindow|SCDisplay initWith|com.apple.xpc:connection' > $out/full.log
-cp $(ls -t ~/Library/Logs/DiagnosticReports/DisplayLinkUserAgent-*.ips 2>/dev/null | head -3) $out/ 2>/dev/null
-echo "saved to $out"
+(( $? > 1 )) && failed+=(timeline.log)
+print -r -- $logs \
+  | grep -i -E 'displaylink|thunderbolt|Display:Virtual' \
+  | grep -v -E 'SCRunningApplication|SCWindow|SCDisplay initWith|com.apple.xpc:connection' \
+  > $out/full.log
+(( $? > 1 )) && failed+=(full.log)
+
+reports=(~/Library/Logs/DiagnosticReports/DisplayLinkUserAgent-*.ips(N.om[1,3]))
+(( $#reports )) && { cp -- $reports $out/ || failed+=("crash reports"); }
+
+if (( $#failed )); then
+  echo "partial snapshot in $out; failed: ${(j:, :)failed}" >&2
+  exit 1
+fi
+echo "saved to $out (${#reports} crash reports)"

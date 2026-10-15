@@ -47,6 +47,8 @@ Each run writes `~/dock-debug/<timestamp>-<label>/`, which contains:
 | `full.log` | Last 20 minutes of DisplayLink, Thunderbolt, and virtual display log lines, without the screen-capture spam |
 | `*.ips` | The three newest `DisplayLinkUserAgent` crash reports |
 
-Snapshots stay outside this repo because they contain device serial numbers, window titles, and crash reports.
+Snapshots stay outside this repo because they contain device serial numbers, window titles, and crash reports. The script makes `~/dock-debug/` and everything in it readable only by you, and the label must be a plain name (no `/` or leading `.`).
+
+If any part of the capture fails, the script names the failed parts and exits nonzero.
 
 The script is read-only. `log show` may take a minute.
