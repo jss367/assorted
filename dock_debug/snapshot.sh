@@ -21,14 +21,18 @@ if ! mkdir -p $root || ! chmod 700 $root || ! mkdir $out; then
 fi
 
 failed=()
+# The system_profiler sections must succeed. The others may legitimately come up
+# empty when the dock is broken (no DisplayLink process, device, or crash reports).
 {
   date; sw_vers
   echo "DisplayLink Manager: $(defaults read '/Applications/DisplayLink Manager.app/Contents/Info' CFBundleShortVersionString 2>/dev/null)"
   echo; echo "== DisplayLink processes"; ps -o pid,lstart,etime,command -p $(pgrep -d, -i displaylink) 2>/dev/null
   echo; echo "== DisplayLink crash reports (newest first)"; ls -lt ~/Library/Logs/DiagnosticReports/ | grep -i displaylink | head
-  echo; echo "== Displays"; system_profiler SPDisplaysDataType
-  echo; echo "== DisplayLink USB device"; system_profiler SPUSBHostDataType | grep -B3 -A10 -i displaylink
-  echo; echo "== Thunderbolt"; system_profiler SPThunderboltDataType
+  echo; echo "== Displays"; system_profiler SPDisplaysDataType || failed+=("summary: displays")
+  echo; echo "== DisplayLink USB device"
+  usb=$(system_profiler SPUSBHostDataType) || failed+=("summary: USB")
+  print -r -- $usb | grep -B3 -A10 -i displaylink
+  echo; echo "== Thunderbolt"; system_profiler SPThunderboltDataType || failed+=("summary: Thunderbolt")
 } > $out/summary.txt 2>&1 || failed+=(summary.txt)
 
 # capture [-i] <file> <include-regex> [exclude-regex]: filter $logs into <file>.
@@ -41,7 +45,8 @@ capture() {
   local f=$out/$1
   : > $f || { failed+=($1); return }
   print -r -- $logs | grep $flags $2 | grep -v -E ${3:-'^$'} >> $f
-  (( $? > 1 )) && failed+=($1)
+  local -a st=($pipestatus)
+  (( st[1] || st[2] > 1 || st[3] > 1 )) && failed+=($1)
 }
 
 # One log read feeds both files.
