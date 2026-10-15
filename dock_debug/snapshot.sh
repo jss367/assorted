@@ -30,17 +30,20 @@ failed=()
   echo; echo "== Thunderbolt"; system_profiler SPThunderboltDataType
 } > $out/summary.txt 2>&1 || failed+=(summary.txt)
 
-# One log read feeds both files. grep exits 1 on no matches, which is a valid empty capture.
+# capture <file> <include-regex> [exclude-regex]: filter $logs into <file>.
+# The file is opened first so an open failure isn't mistaken for grep's
+# "no matches" (exit 1), which is a valid empty capture.
+capture() {
+  local f=$out/$1
+  : > $f || { failed+=($1); return }
+  print -r -- $logs | grep -E $2 | grep -v -E ${3:-'^$'} >> $f
+  (( $? > 1 )) && failed+=($1)
+}
+
+# One log read feeds both files.
 logs=$(/usr/bin/log show --last 20m --style compact) || failed+=("log show")
-print -r -- $logs \
-  | grep -E 'chimeOnAttach" age:00:00:00|Display:Virtual    \] Will bring display|DisplayLinkUserAgent.* E  |launchd.*displaylink.*(exited|crashed)|ScreenCaptureKit.*ERROR' \
-  > $out/timeline.log
-(( $? > 1 )) && failed+=(timeline.log)
-print -r -- $logs \
-  | grep -i -E 'displaylink|thunderbolt|Display:Virtual' \
-  | grep -v -E 'SCRunningApplication|SCWindow|SCDisplay initWith|com.apple.xpc:connection' \
-  > $out/full.log
-(( $? > 1 )) && failed+=(full.log)
+capture timeline.log 'chimeOnAttach" age:00:00:00|Display:Virtual    \] Will bring display|DisplayLinkUserAgent.* E  |launchd.*displaylink.*(exited|crashed)|ScreenCaptureKit.*ERROR'
+capture full.log '[Dd]isplay[Ll]ink|[Tt]hunderbolt|Display:Virtual' 'SCRunningApplication|SCWindow|SCDisplay initWith|com.apple.xpc:connection'
 
 reports=(~/Library/Logs/DiagnosticReports/DisplayLinkUserAgent-*.ips(N.om[1,3]))
 (( $#reports )) && { cp -- $reports $out/ || failed+=("crash reports"); }
