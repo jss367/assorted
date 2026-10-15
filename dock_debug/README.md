@@ -20,9 +20,9 @@ A second failure looked different. On 2026-10-15 the monitors were lit but the c
 
 - macOS had both LGs online, unmirrored, and laid out edge to edge with the laptop. It placed the cursor on the external main display, so the monitors were most likely showing a frozen frame.
 - The agent had been running since morning with no crash. Its log showed ScreenCaptureKit `stopCapture` errors (`SCStreamErrorDomain` code `-3808`) at 15:22 and 15:34.
-- Running `./snapshot.sh bad` fixed it without restarting the agent or replugging. The agent started new capture streams at 15:37:33.28, the same second the snapshot began.
+- The monitors recovered while `./snapshot.sh bad` ran, without restarting the agent or replugging. The agent started new capture streams at 15:37:33.28, the same second the snapshot began.
 
-The snapshot's first slow step is `system_profiler SPDisplaysDataType`, which probes the displays. That probe probably made the agent rebuild its capture streams. The timing suggests this but doesn't prove it, and it has only happened once.
+The snapshot runs `system_profiler SPDisplaysDataType`, which probes the displays, before it collects recent logs. The probe is a suspected trigger for the agent rebuilding its capture streams, but the timing does not establish causation, and recovery during a snapshot has only been observed once.
 
 ## When the monitors don't come up
 
@@ -48,7 +48,7 @@ The snapshot's first slow step is `system_profiler SPDisplaysDataType`, which pr
    killall DisplayLinkUserAgent; open -a "DisplayLink Manager"
    ```
 
-4. If that fixes it, the agent was the problem. Take a `good` snapshot and compare the two.
+4. If the monitors recover after restarting the agent, take a `good` snapshot and compare the two. Record that recovery followed the restart; this does not prove what caused the failure.
 
 ## Usage
 
