@@ -6,7 +6,7 @@ Notes on the macOS dialog "A keychain cannot be found to store 'Chrome'", first 
 
 These observations were recorded at about 17:25 on 2026-10-16 (macOS 27.0.1, Chrome 155.0.8059.82):
 
-- `~/Library/Keychains/login.keychain-db` exists and is the default, login, and only user keychain.
+- `~/Library/Keychains/login.keychain-db` exists, is the default and login keychain, and is the only entry in the user keychain search list.
 - The login keychain reports `no-timeout`, an automatic-lock setting. This does not establish whether it is currently unlocked.
 - The `Chrome Safe Storage` item (account `Chrome`) is present. It was created on 2025-12-07 and hasn't been modified since.
 
